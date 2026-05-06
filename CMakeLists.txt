@@ -75,3 +75,6 @@ target_link_libraries(demo PRIVATE
 target_link_libraries(demo PRIVATE 
     vulkan_cpp
 )
+target_link_libraries(demo PRIVATE 
+    geometry_cpp
+)

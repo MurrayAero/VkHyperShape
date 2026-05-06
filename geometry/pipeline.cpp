@@ -1,4 +1,4 @@
-#include "cylinder.h"
+#include "pipeline.h"
 template<typename VecType>
 VecType bezier(const VecType& p0, const VecType& p1, const VecType& p2, const VecType& p3, float t) {
     float u = 1.0f - t;
@@ -97,7 +97,7 @@ void generateCurvedCylinder(std::vector<Vertex>& vertices, std::vector<uint16_t>
         const mglm::vec4& N2 = normals2[i];
         
         for (int j = 0; j < segments; ++j) {
-            float angle = 2.0f * M_PI * static_cast<float>(j) / segments;
+            float angle = glm::two_pi<float>() * static_cast<float>(j) / segments;
             
             mglm::vec4 offset = N1 * (std::cos(angle) * radius) + N2 * (std::sin(angle) * radius);
             mglm::vec4 vertexPos = center + offset;
@@ -151,7 +151,7 @@ void generateCurvedCylinder(std::vector<Vertex>& vertices, std::vector<uint16_t>
         up = glm::normalize(glm::cross(tangent, right));
         
         for (int j = 0; j < segments; ++j) {
-            float angle = 2.0f * M_PI * static_cast<float>(j) / segments;
+            float angle = glm::two_pi<float>() * static_cast<float>(j) / segments;
             
             glm::vec3 offset = right * std::cos(angle) * radius + up * std::sin(angle) * radius;
             glm::vec3 vertexPos = center + offset;
@@ -177,27 +177,27 @@ void generateCurvedCylinder(std::vector<Vertex>& vertices, std::vector<uint16_t>
         }
     }
 }
-Cylinder::Cylinder(/* args */){
+Pipeline::Pipeline(/* args */){
 }
 
-Cylinder::~Cylinder(){
+Pipeline::~Pipeline(){
 }
-void Cylinder::Cleanup(){
+void Pipeline::Cleanup(){
     mGeometry.Destroy(*gpu.device);
     mWireframe.Destroy(*gpu.device);
 }
 
-void Cylinder::Draw(vk::CommandBuffer command, vk::PipelineLayout layout){
+void Pipeline::Draw(vk::CommandBuffer command, vk::PipelineLayout layout){
     mGeometry.Bind(command);
     mGeometry.Draw(command);
 }
 
-void Cylinder::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
+void Pipeline::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
     mWireframe.Bind(command);
     mWireframe.Draw(command);
 }
 
-void Cylinder::Update(const void *useData){
+void Pipeline::Update(const void *useData){
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
     CylinderParameter parameter = *(CylinderParameter *)useData;

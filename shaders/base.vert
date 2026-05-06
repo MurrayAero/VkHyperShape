@@ -7,6 +7,7 @@ layout(location = 0) out vec3 outColor;
 layout(push_constant) uniform PushConstants {
     mat4 model;
     mat4 projection;
+    // float projection[5][5];//有一部分图形被裁掉了
 } pc;
 
 layout(binding = 0) uniform UniformBuffer {
@@ -45,10 +46,10 @@ vec4 mvp_vec_transform(vec4 pos){
     float point[5], inpos[5] = float[5](pos.x, pos.y, pos.z, pos.w, 1.0f);
     mvp_transform(mvpubo.projection, mvpubo.view, mvpubo.model, mvp);
     mat_vec_mul(mvp, inpos, point);
-    return vec4(point[0] / point[4], point[1] / point[4], point[2] / point[4], point[3] / point[4]);
+    return vec4(point[0], point[1], point[2], point[3]);
 }
 void main() {
     outColor = inColor;
     vec4 point = mvp_vec_transform(inPos);
-	gl_Position = pc.projection * ubo.view * vec4(vec3(point), 1.0);
+	gl_Position = pc.projection * ubo.view * point;
 }

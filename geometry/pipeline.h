@@ -1,5 +1,5 @@
-#ifndef CYLINDER_H
-#define CYLINDER_H
+#ifndef PIPELINE_H
+#define PIPELINE_H
 #include "geometry.h"
 struct CylinderParameter{
     float radius = .015;
@@ -8,12 +8,12 @@ struct CylinderParameter{
     //这样写能直接传给imgui
     std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
 };
-class Cylinder:public Geometry{
+class Pipeline:public Geometry{
     vulkan::Primitive mGeometry;
     vulkan::Primitive mWireframe;
 public:
-    Cylinder(/* args */);
-    ~Cylinder();
+    Pipeline(/* args */);
+    ~Pipeline();
     virtual void Cleanup();
 
     virtual void Draw(vk::CommandBuffer command, vk::PipelineLayout layout);

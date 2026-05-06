@@ -5,10 +5,10 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
 
     const float a = radius, b = radius * 0.5f;
     for (int i = 0; i <= uSegments; ++i) {
-        const float u = (2.0f * M_PI * i) / uSegments;
+        const float u = (glm::two_pi<float>() * i) / uSegments;
         const float half_u = u / 2.0f;
         for (int j = 0; j <= vSegments; ++j) {
-            float v = (2.0f * M_PI * j) / vSegments;
+            float v = (glm::two_pi<float>() * j) / vSegments;
 
             float x = (a + b * cosf(v)) * cosf(u);
             float y = (a + b * cosf(v)) * sinf(u);
@@ -46,10 +46,10 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
 // void KleinBottle::Generate(std::vector<uint16_t>&indices, std::vector<Vertex>&vertices, int uRes, int vRes) {
 //     Vertex vert;
 //     for (int i = 0; i <= uRes; i++) {
-//         float u = 2.0f * M_PI * i / uRes;
+//         float u = glm::two_pi<float>() * i / uRes;
         
 //         for (int j = 0; j <= vRes; j++) {
-//             float v = 2.0f * M_PI * j / vRes;
+//             float v = glm::two_pi<float>() * j / vRes;
 //             if (u < M_PI) {
 //                 float scale = 4.0f * (1.0f - cos(u)/2.0f);
 //                 float w = scale * sin(v);  // v=0 时 w=0, v=π/2 时 w=+scale, v=π 时 w=0, v=3π/2 时 w=-scale

@@ -18,7 +18,7 @@ std::vector<Vertex>generateHypersphere(uint32_t stacksPhi, uint32_t stacksTheta,
             float theta = glm::pi<float>() * j / stacksTheta;
 
             for (uint32_t k = 0; k < slicesPsi; ++k) {
-                float psi = 2.0f * glm::pi<float>() * k / slicesPsi;
+                float psi = glm::two_pi<float>() * k / slicesPsi;
 
                 float sinPhi = sin(phi);
                 float x = sinPhi * sin(theta) * cos(psi);
@@ -51,16 +51,15 @@ std::vector<uint16_t>generateHypersphereIndices(uint32_t stacksPhi, uint32_t sta
         for (uint16_t j = 0; j < stacksTheta; ++j) {
             for (uint16_t k = 0; k < slicesPsi; ++k) {
 
-                uint16_t a = idx(i,     j,     k);
-                uint16_t b = idx(i + 1, j,     k);
-                uint16_t c = idx(i,     j + 1, k);
-                uint16_t d = idx(i,     j,     (k + 1) % slicesPsi);
+                uint16_t a = idx(i, j, k);
+                uint16_t b = idx(i + 1, j, k);
+                uint16_t c = idx(i, j + 1, k);
+                uint16_t d = idx(i, j, (k + 1) % slicesPsi);
                 uint16_t e = idx(i + 1, j + 1, k);
-                uint16_t f = idx(i + 1, j,     (k + 1) % slicesPsi);
-                uint16_t g = idx(i,     j + 1, (k + 1) % slicesPsi);
+                uint16_t f = idx(i + 1, j, (k + 1) % slicesPsi);
+                uint16_t g = idx(i, j + 1, (k + 1) % slicesPsi);
                 uint16_t h = idx(i + 1, j + 1, (k + 1) % slicesPsi);
 
-                // 6 tetrahedra filling the 4D cube
                 addTetra(a, b, c, d);
                 addTetra(b, c, d, e);
                 addTetra(b, d, e, f);

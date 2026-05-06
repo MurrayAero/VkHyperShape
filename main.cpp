@@ -15,12 +15,12 @@
 #endif
 #include "geometry/grid.h"
 #include "geometry/clifford.h"
-#include "geometry/cylinder.h"
+#include "geometry/pipeline.h"
 #include "geometry/tesseract.h"
 #include "geometry/hexadeca.h"
 #include "geometry/icositetra.h"
 #include "geometry/pentatope.h"
-#include "geometry/cylindrical.h"
+#include "geometry/spherinder.h"
 #include "geometry/kleinBottle.h"
 #include "geometry/hypersphere.h"
 struct ImGuiPlaneInput{
@@ -51,7 +51,7 @@ struct ImGuiInput{
     bool icositetra = false;
     bool hexadeca = false;
     bool pentatope = false;
-    bool cylindrical = false;
+    bool spherinder = false;
     bool kleinBottle = false;
     bool hypersphere = false;
     bool UpdateGeometry = false;
@@ -71,7 +71,7 @@ struct ImGuiInput{
         icositetra = false;
         hexadeca = false;
         pentatope = false;
-        cylindrical = false;
+        spherinder = false;
         kleinBottle = false;
         hypersphere = false;
         // memset(this, 0, sizeof(ImGuiInput));
@@ -125,7 +125,7 @@ struct ImGuiInput{
     }
     void SelectCylindrical(){
         UnSelect();
-        cylindrical = true;
+        spherinder = true;
         UpdateGeometry = true;
     }
     void SelectGrid3D(){
@@ -236,7 +236,7 @@ void SetPlane(const std::string&splane){
 void UpdateUniform(const vulkan::Device&device){
     mglm::mat5 projection;
     if(g_ImGuiInput.ortho){
-        projection = mglm::ortho(-1, 1, -1, 1, -1.0f, 1.0f, -1, 1.0f);
+        projection = mglm::ortho(-1, 1, -1, 1, -1, 1, -1, 1);
     }
     else{
         projection = mglm::perspective(glm::radians(45.0f), glm::radians(45.0f), glm::radians(45.0f), .1f, 100.0f);
@@ -255,7 +255,7 @@ void UpdateUniform(const vulkan::Device&device){
 }
 void ShowGeometry(){
     ImGui::SeparatorText("几何");
-    const std::array currentItems = { "超立方体", "超圆柱", "球", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "Clifford环面", "克莱因瓶", "三维网格", "四维网格",
+    const std::array currentItems = { "超立方体", "球柱体", "球", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "Clifford环面", "克莱因瓶", "三维网格", "四维网格",
 #ifdef DEBUG
         "图元测试"
 #endif
@@ -290,7 +290,7 @@ void ShowGeometry(){
                 else if(geometry == "克莱因瓶"){
                     g_ImGuiInput.SelectKleinBottle();
                 }
-                else if(geometry == "超圆柱"){
+                else if(geometry == "球柱体"){
                     g_ImGuiInput.SelectCylindrical();
                 }
                 else if(geometry == "四维字"){
@@ -676,7 +676,7 @@ void display(GLFWwindow* window){
             g_Geometry = new Font;
         }
         else if(g_ImGuiInput.cylinder){
-            g_Geometry = new Cylinder;
+            g_Geometry = new Pipeline;
         }
         else if(g_ImGuiInput.kleinBottle){
             g_Geometry = new KleinBottle;
@@ -687,8 +687,8 @@ void display(GLFWwindow* window){
         else if(g_ImGuiInput.grid4d){
             g_Geometry = new Grid4D;
         }
-        else if(g_ImGuiInput.cylindrical){   
-            g_Geometry = new Cylindrical;
+        else if(g_ImGuiInput.spherinder){   
+            g_Geometry = new Spherinder;
         }
         else if(g_ImGuiInput.hypersphere){
             g_Geometry = new Hypersphere;

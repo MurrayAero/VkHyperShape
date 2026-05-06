@@ -1,5 +1,5 @@
 #include "grid.h"
-inline void Grid3D::Cleanup(){
+void Grid3D::Cleanup(){
     mGrid.Destroy(*gpu.device);
 }
 
@@ -105,7 +105,7 @@ void Grid3D::Update(const void *useData){
     }
 }
 
-inline void Grid4D::Cleanup(){
+void Grid4D::Cleanup(){
     mGrid.Destroy(*gpu.device);
 }
 

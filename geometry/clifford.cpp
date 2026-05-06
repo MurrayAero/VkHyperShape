@@ -31,15 +31,13 @@ std::vector<uint16_t> generateCliffordTorusWireframeIndices(uint32_t uSegments, 
 
     for (uint16_t i = 0; i < uSegments; ++i) {
         for (uint16_t j = 0; j < vSegments; ++j) {
-            uint16_t i1 = index(i,     j);
+            uint16_t i1 = index(i, j);
             uint16_t i2 = index(i + 1, j);
-            uint16_t i3 = index(i,     j + 1);
+            uint16_t i3 = index(i, j + 1);
 
-            // 边 1: (i, j) -> (i+1, j)
             lineIndices.push_back(i1);
             lineIndices.push_back(i2);
 
-            // 边 2: (i, j) -> (i, j+1)
             lineIndices.push_back(i1);
             lineIndices.push_back(i3);
         }
@@ -58,9 +56,9 @@ std::vector<uint16_t> generateCliffordTorusIndices(uint32_t uSegments, uint32_t 
     for (uint16_t i = 0; i < uSegments; ++i) {
         for (uint16_t j = 0; j < vSegments; ++j) {
 
-            uint16_t i1 = index(i,     j);
+            uint16_t i1 = index(i, j);
             uint16_t i2 = index(i + 1, j);
-            uint16_t i3 = index(i,     j + 1);
+            uint16_t i3 = index(i, j + 1);
             uint16_t i4 = index(i + 1, j + 1);
 
             indices.push_back(i1);

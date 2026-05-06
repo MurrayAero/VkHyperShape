@@ -1,6 +1,10 @@
 #ifndef TRANS_FORM_HPP
 #define TRANS_FORM_HPP
 #include "mglm.hpp"
+#ifdef WIN32
+#undef near
+#undef far
+#endif
 namespace mglm{
     struct Plane {
         vec4 u;
@@ -146,10 +150,20 @@ namespace mglm{
         return view;
     }
     inline mat5 lookAt(const vec4& eye, const vec4& target, const vec4& up) {
-        vec4 forward4 = normalize(target - eye);
-        vec4 over(0, 0, 0, 1);
-        if (std::abs(dot(over, forward4)) > 0.99f) {
-            over = vec4(0, 0, 1, 0);
+        vec4 forward = normalize(target - eye);
+        vec4 Up = normalize(up);
+
+        const mat4 basis(1.0f);
+        
+        vec4 over = basis[0];
+        float maxVol = length(cross(over, Up, forward));
+        
+        for (int i = 1; i < 4; ++i) {
+            float vol = length(cross(basis[i], Up, forward));
+            if (vol > maxVol) {
+                maxVol = vol;
+                over = basis[i];
+            }
         }
         return lookAt(eye, target, up, over);
     }
