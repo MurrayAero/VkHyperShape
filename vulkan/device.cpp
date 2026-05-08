@@ -74,6 +74,7 @@ namespace vulkan{
         deviceFeatures.samplerAnisotropy = VK_TRUE;
         deviceFeatures.geometryShader = state.enableGeometryShader;
         deviceFeatures.tessellationShader = state.enableTessellationShader;
+        deviceFeatures.fragmentStoresAndAtomics = state.enableFragmentStoresAndAtomics;
         vk::PhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures(state.enableMeshShader, state.enableMeshShader);
         if(state.enableDynamicRendering){
             vk::PhysicalDeviceFeatures2 deviceFeatures2;
@@ -100,7 +101,14 @@ namespace vulkan{
         if(mLogger)mLogger->info(state.enableDynamicRendering?"enable dynamic rendering":"failed to enable dynamic rendering");
         return state.enableDynamicRendering;
     }
-    bool Device::IsSupportedExtension(const char* extensionName)const noexcept{
+    bool Device::EnableFragmentStoresAndAtomics(){
+        assert(physical && "physical device is null, call SelectPhysicalDevice before calling this function");
+        vk::PhysicalDeviceFeatures features = physical.getFeatures();
+        state.enableFragmentStoresAndAtomics = features.fragmentStoresAndAtomics;
+        if(mLogger)mLogger->info(state.enableDynamicRendering?"enable fragment stores and atomics":"failed to enable fragment stores and atomics");
+        return state.enableFragmentStoresAndAtomics;
+    }
+    bool Device::IsSupportedExtension(const char *extensionName) const noexcept{
         auto extensions = physical.enumerateDeviceExtensionProperties();
         for (const auto& ext : extensions) {
             if (!strcmp(ext.extensionName, extensionName)) {

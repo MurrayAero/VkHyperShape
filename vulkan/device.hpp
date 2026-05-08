@@ -19,6 +19,7 @@ namespace vulkan{
 
         bool EnableMeshShader();
         bool EnableDynamicRendering();
+        bool EnableFragmentStoresAndAtomics();
 
         bool IsSupportedExtension(const char* extensionName)const noexcept;
 
@@ -36,17 +37,17 @@ namespace vulkan{
         // inline operator vma::Allocator() const noexcept{
         //     return allocator;
         // }
-        inline void EnableGeometryShader()noexcept{
-            state.enableGeometryShader = true;
-        }
         inline void EnableValidation()noexcept{
             state.enableValidation = true;
+        }
+        inline void EnableGeometryShader()noexcept{
+            state.enableGeometryShader = true;
         }
         inline void EnableTessellationShader()noexcept{
             state.enableTessellationShader= true;
         }
         //nodiscard表示返回值应该被使用
-        [[nodiscard]] inline auto&GetDevice()const noexcept{
+        [[nodiscard]]inline auto&GetDevice()const noexcept{
             return device;
         }
         inline auto&GetInstance()const noexcept{
@@ -78,6 +79,7 @@ namespace vulkan{
             bool enableGeometryShader;
             bool enableDynamicRendering;
             bool enableTessellationShader;
+            bool enableFragmentStoresAndAtomics;
         }state;
         
         vk::Device device = {};

@@ -1,8 +1,8 @@
 #include <array>
+#include <cstring>
 #include <thread>
 #include <chrono>
 #include <iostream>
-
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
@@ -14,7 +14,9 @@
 #include "geometry/test.h"
 #endif
 #include "geometry/grid.h"
+#include "geometry/torus.h"
 #include "geometry/clifford.h"
+#include "geometry/cylinder.h"
 #include "geometry/pipeline.h"
 #include "geometry/tesseract.h"
 #include "geometry/hexadeca.h"
@@ -39,117 +41,119 @@ struct MVP_UBO{
     float projection[5][5];
 };
 struct ImGuiInput{
-    bool grid4d;
-    bool grid3d;
-    bool fill = true;
-    bool font = false;
-    bool ortho = false;
-    bool sphere = false;
-    bool clifford = false;
-    bool cylinder = false;
-    bool tesseract = true;
-    bool icositetra = false;
-    bool hexadeca = false;
-    bool pentatope = false;
-    bool spherinder = false;
-    bool kleinBottle = false;
-    bool hypersphere = false;
-    bool UpdateGeometry = false;
-    CylinderParameter parameter;
+    struct{
+        bool font = false;
+        bool torus = false;
+        bool grid4d = false;
+        bool grid3d = false;
+        bool sphere = false;
+        bool clifford = false;
+        bool pipeline = false;
+        bool cylinder = false;
+        bool tesseract = true;
+        bool icositetra = false;
+        bool hexadeca = false;
+        bool pentatope = false;
+        bool spherinder = false;
+        bool kleinBottle = false;
+        bool hypersphere = false;
 #ifdef DEBUG
     bool testGeometry = false;
 #endif
-    void UnSelect(){
-        font = false;
-        ortho = false;
-        grid4d = false;
-        grid3d = false;
-        sphere = false;
-        clifford = false;
-        cylinder = false;
-        tesseract = false;
-        icositetra = false;
-        hexadeca = false;
-        pentatope = false;
-        spherinder = false;
-        kleinBottle = false;
-        hypersphere = false;
-        // memset(this, 0, sizeof(ImGuiInput));
-    }
+        bool UpdateGeometry = false;
+        PipelineParameter parameter;
+        void UnSelect(){
+            memset(this, 0, sizeof(*this));
+        }
 #ifdef DEBUG
-    void SeletctTestGeometry(){
-        UnSelect();
-        testGeometry = true;
-        UpdateGeometry = true;
-    }
+        void SeletctTestGeometry(){
+            UnSelect();
+            testGeometry = true;
+            UpdateGeometry = true;
+        }
 #endif
-    void SelectTesseract(){
-        UnSelect();
-        tesseract = true;
-        UpdateGeometry = true;
-    }
-    void SelectSphere(){
-        UnSelect();
-        sphere = true;
-        UpdateGeometry = true;
-    }
-    void SelectPentatope(){
-        UnSelect();
-        pentatope = true;
-        UpdateGeometry = true;
-    }
-    void SelectIcositetra(){
-        UnSelect();
-        icositetra = true;
-        UpdateGeometry = true;
-    }
-    void SelectCylinder(){
-        UnSelect();
-        cylinder = true;
-        UpdateGeometry = true;
-    }
-    void SelectClifford(){
-        UnSelect();
-        clifford = true;
-        UpdateGeometry = true;
-    }
-    void SelectHexadeca(){
-        UnSelect();
-        hexadeca = true;
-        UpdateGeometry = true;
-    }
-    void SelectKleinBottle(){
-        UnSelect();
-        kleinBottle = true;
-        UpdateGeometry = true;
-    }
-    void SelectCylindrical(){
-        UnSelect();
-        spherinder = true;
-        UpdateGeometry = true;
-    }
-    void SelectGrid3D(){
-        UnSelect();
-        fill = false;
-        grid3d = true;
-        UpdateGeometry = true;
-    }
-    void SelectGrid4D(){
-        UnSelect();
-        fill = false;
-        grid4d = true;
-        UpdateGeometry = true;
-    }
-    void SelectHypersphere(){
-        UnSelect();
-        hypersphere = true;
-        UpdateGeometry = true;        
-    }
-    void SelectFont(){
-        UnSelect();
-        font = true;
-        UpdateGeometry = true;
-    }
+        void SelectTesseract(){
+            UnSelect();
+            tesseract = true;
+            UpdateGeometry = true;
+        }
+        void SelectSphere(){
+            UnSelect();
+            sphere = true;
+            UpdateGeometry = true;
+        }
+        void SelectTorus(){
+            UnSelect();
+            torus = true;
+            UpdateGeometry = true;
+        }
+        void SelectPentatope(){
+            UnSelect();
+            pentatope = true;
+            UpdateGeometry = true;
+        }
+        void SelectIcositetra(){
+            UnSelect();
+            icositetra = true;
+            UpdateGeometry = true;
+        }
+        void SelectPipeline(){
+            UnSelect();
+            pipeline = true;
+            UpdateGeometry = true;
+        }
+        void SelectCylinder(){
+            UnSelect();
+            cylinder = true;
+            UpdateGeometry = true;
+        }
+        void SelectClifford(){
+            UnSelect();
+            clifford = true;
+            UpdateGeometry = true;
+        }
+        void SelectHexadeca(){
+            UnSelect();
+            hexadeca = true;
+            UpdateGeometry = true;
+        }
+        void SelectKleinBottle(){
+            UnSelect();
+            kleinBottle = true;
+            UpdateGeometry = true;
+        }
+        void SelectCylindrical(){
+            UnSelect();
+            spherinder = true;
+            UpdateGeometry = true;
+        }
+        void SelectGrid3D(){
+            UnSelect();
+            grid3d = true;
+            UpdateGeometry = true;
+        }
+        void SelectGrid4D(){
+            UnSelect();
+            grid4d = true;
+            UpdateGeometry = true;
+        }
+        void SelectHypersphere(){
+            UnSelect();
+            hypersphere = true;
+            UpdateGeometry = true;        
+        }
+        void SelectFont(){
+            UnSelect();
+            font = true;
+            UpdateGeometry = true;
+        }
+    }geometry;
+    struct{
+        bool preset = true;
+        bool custom = false;
+    }rotateMode;
+    bool fill = true;
+    bool ortho = false;
 };
 struct PushConstant{
     glm::mat4 model;
@@ -161,6 +165,14 @@ struct GraphicsPipeline{
     vk::PipelineLayout layout;
     vk::Pipeline fill, wireframe;
 };
+//目前没法用
+#ifdef ENABE_DEPTH_TEST
+struct DepthTest{
+    vulkan::Image depth;
+    vk::DescriptorSet set;
+    vk::DescriptorSetLayout setLayout;
+};
+#endif
 vulkan::Pool g_VulkanPool;
 vulkan::Queue g_VulkanQueue;
 vulkan::Device g_VulkanDevice;
@@ -185,52 +197,62 @@ std::array<ImGuiPlaneInput, 2>g_Plane;
 
 ImGuiInput g_ImGuiInput;
 
+#ifdef ENABE_DEPTH_TEST
+DepthTest g_DepthTest;
+#endif
 mglm::vec4 g_CameraPos = mglm::vec4(0, 0, 0, 3);
 const char *GetPlaneString(const mglm::Plane&plane){
-    if(mglm::abs(plane) == mglm::planes::XY){
-        return "XY";
+    std::string strPlane;
+    if(mglm::abs(plane.u) == mglm::vec4(1, 0, 0, 0)){
+        strPlane += "X";
     }
-    else if(mglm::abs(plane) == mglm::planes::XZ){
-        return "XZ";
+    if(mglm::abs(plane.u) == mglm::vec4(0, 1, 0, 0)){
+        strPlane += "Y";
     }
-    else if(mglm::abs(plane) == mglm::planes::YZ){
-        return "YZ";
+    if(mglm::abs(plane.u) == mglm::vec4(0, 0, 1, 0)){
+        strPlane += "Z";
     }
-    else if(mglm::abs(plane) == mglm::planes::XW){
-        return "XW";
+    if(mglm::abs(plane.u) == mglm::vec4(0, 0, 0, 1)){
+        strPlane += "W";
     }
-    else if(mglm::abs(plane) == mglm::planes::YW){
-        return "YW";
+    if(mglm::abs(plane.v) == mglm::vec4(1, 0, 0, 0)){
+        strPlane += "X";
     }
-    else if(mglm::abs(plane) == mglm::planes::ZW){
-        return "ZW";
+    if(mglm::abs(plane.v) == mglm::vec4(0, 1, 0, 0)){
+        strPlane += "Y";
     }
-    return "UNKNOW";
+    if(mglm::abs(plane.v) == mglm::vec4(0, 0, 1, 0)){
+        strPlane += "Z";
+    }
+    if(mglm::abs(plane.v) == mglm::vec4(0, 0, 0, 1)){
+        strPlane += "W";
+    }
+    return strPlane.c_str();
 }
 void SetPlane(const std::string&splane){
     if(splane == "XY"){
         g_Plane[0].plane = mglm::planes::XY;
-        g_Plane[1].plane = mglm::orthogonal(g_Plane[0].plane);
+        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "XZ"){
         g_Plane[0].plane = mglm::planes::XZ;
-        g_Plane[1].plane = mglm::orthogonal(g_Plane[0].plane);
+        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "YZ"){
         g_Plane[0].plane = mglm::planes::YZ;
-        g_Plane[1].plane = mglm::orthogonal(g_Plane[0].plane);
+        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "XW"){
         g_Plane[0].plane = mglm::planes::XW;
-        g_Plane[1].plane = mglm::orthogonal(g_Plane[0].plane);
+        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "YW"){
         g_Plane[0].plane = mglm::planes::YW;
-        g_Plane[1].plane = mglm::orthogonal(g_Plane[0].plane);
+        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "ZW"){
         g_Plane[0].plane = mglm::planes::ZW;
-        g_Plane[1].plane = mglm::orthogonal(g_Plane[0].plane);
+        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
 }
 void UpdateUniform(const vulkan::Device&device){
@@ -255,61 +277,79 @@ void UpdateUniform(const vulkan::Device&device){
 }
 void ShowGeometry(){
     ImGui::SeparatorText("几何");
-    const std::array currentItems = { "超立方体", "球柱体", "球", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "Clifford环面", "克莱因瓶", "三维网格", "四维网格",
+    const std::array fdCurrentItems = { "超立方体", "球柱体", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "Clifford环面", "克莱因瓶", "四维网格",
 #ifdef DEBUG
         "图元测试"
 #endif
     };
-    static std::string geometry = currentItems[0];
-    if(ImGui::BeginCombo("几何", geometry.c_str())){
-        for (auto currentGeometry = currentItems.begin(); currentGeometry != currentItems.end(); ++currentGeometry){
-            bool is_selected = geometry == *currentGeometry;
+    static std::string fdGeometry = fdCurrentItems[0];
+    if(ImGui::BeginCombo("四维几何", fdGeometry.c_str())){
+        for (auto currentGeometry = fdCurrentItems.begin(); currentGeometry != fdCurrentItems.end(); ++currentGeometry){
+            bool is_selected = fdGeometry == *currentGeometry;
             if (ImGui::Selectable(*currentGeometry, is_selected)){
-                geometry = *currentGeometry;
-                if(geometry == "超立方体"){
-                    g_ImGuiInput.SelectTesseract();
+                fdGeometry = *currentGeometry;
+                if(fdGeometry == "超立方体"){
+                    g_ImGuiInput.geometry.SelectTesseract();
                 }
-                else if(geometry == "球"){
-                    g_ImGuiInput.SelectSphere();
+                else if(fdGeometry == "超球"){
+                    g_ImGuiInput.geometry.SelectHypersphere();
                 }
-                else if(geometry == "超球"){
-                    g_ImGuiInput.SelectHypersphere();
+                else if(fdGeometry == "正五胞体"){
+                    g_ImGuiInput.geometry.SelectPentatope();
                 }
-                else if(geometry == "正五胞体"){
-                    g_ImGuiInput.SelectPentatope();
+                else if(fdGeometry == "正十六胞体"){
+                    g_ImGuiInput.geometry.SelectHexadeca();
                 }
-                else if(geometry == "正十六胞体"){
-                    g_ImGuiInput.SelectHexadeca();
+                else if(fdGeometry == "正二十四胞体"){
+                    g_ImGuiInput.geometry.SelectIcositetra();
                 }
-                else if(geometry == "正二十四胞体"){
-                    g_ImGuiInput.SelectIcositetra();
+                else if(fdGeometry == "Clifford环面"){
+                    g_ImGuiInput.geometry.SelectClifford();
                 }
-                else if(geometry == "Clifford环面"){
-                    g_ImGuiInput.SelectClifford();
+                else if(fdGeometry == "克莱因瓶"){
+                    g_ImGuiInput.geometry.SelectKleinBottle();
                 }
-                else if(geometry == "克莱因瓶"){
-                    g_ImGuiInput.SelectKleinBottle();
+                else if(fdGeometry == "球柱体"){
+                    g_ImGuiInput.geometry.SelectCylindrical();
                 }
-                else if(geometry == "球柱体"){
-                    g_ImGuiInput.SelectCylindrical();
+                else if(fdGeometry == "四维字"){
+                    g_ImGuiInput.geometry.SelectFont();
                 }
-                else if(geometry == "四维字"){
-                    g_ImGuiInput.SelectFont();
+                else if(fdGeometry == "贝塞尔管道"){
+                    g_ImGuiInput.geometry.SelectPipeline();
                 }
-                else if(geometry == "贝塞尔管道"){
-                    g_ImGuiInput.SelectCylinder();
-                }
-                else if(geometry == "三维网格"){
-                    g_ImGuiInput.SelectGrid3D();
-                }
-                else if(geometry == "四维网格"){
-                    g_ImGuiInput.SelectGrid4D();
+                else if(fdGeometry == "四维网格"){
+                    g_ImGuiInput.geometry.SelectGrid4D();
                 }
 #ifdef DEBUG
-                else if(geometry == "图元测试"){
-                    g_ImGuiInput.SeletctTestGeometry();
+                else if(fdGeometry == "图元测试"){
+                    g_ImGuiInput.geometry.SeletctTestGeometry();
                 }
 #endif
+                break;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    const std::array tdCurrentItems = { "球", "圆柱体", "环面", "三维网格" };
+    static std::string tdGeometry = tdCurrentItems[0];
+    if(ImGui::BeginCombo("三维几何", tdGeometry.c_str())){
+        for (auto currentGeometry = tdCurrentItems.begin(); currentGeometry != tdCurrentItems.end(); ++currentGeometry){
+            bool is_selected = tdGeometry == *currentGeometry;
+            if (ImGui::Selectable(*currentGeometry, is_selected)){
+                tdGeometry = *currentGeometry;
+                if(tdGeometry == "球"){
+                    g_ImGuiInput.geometry.SelectSphere();
+                }
+                else if(tdGeometry == "圆柱体"){
+                    g_ImGuiInput.geometry.SelectCylinder();
+                }
+                else if(tdGeometry == "环面"){
+                    g_ImGuiInput.geometry.SelectTorus();
+                }
+                else if(tdGeometry == "三维网格"){
+                    g_ImGuiInput.geometry.SelectGrid3D();
+                }
                 break;
             }
         }
@@ -333,10 +373,43 @@ void ShowPlaneCombo(const char *lable){
 }
 void ShowRotate(){
     ImGui::SeparatorText("四维旋转");
-    ShowPlaneCombo("平面一");
-    ImGui::SameLine();
-    ImGui::Text("平面二:%s", GetPlaneString(g_Plane[1].plane));
-    static bool syncAngle, modifyPlane;
+    if(g_ImGuiInput.rotateMode.preset){
+        ShowPlaneCombo("平面一");
+        ImGui::SameLine();
+        ImGui::Text("平面二:%s", GetPlaneString(g_Plane[1].plane));
+    }
+    else{
+        static float planeVec[][4] = { {g_Plane[0].plane.u.x, g_Plane[0].plane.u.y, g_Plane[0].plane.u.z, g_Plane[0].plane.u.w}, {g_Plane[0].plane.v.x, g_Plane[0].plane.v.y, g_Plane[0].plane.v.z, g_Plane[0].plane.v.w} };
+        ImGui::Text("平面一");
+        if(ImGui::InputFloat4("u", planeVec[0])){
+            g_Plane[0].plane.u = mglm::vec4(planeVec[0][0], planeVec[0][1], planeVec[0][2], planeVec[0][3]);
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("获取v")){
+            g_Plane[0].plane.v = mglm::getOrthogonal(g_Plane[0].plane.u);
+            planeVec[1][0] = g_Plane[0].plane.v.x;
+            planeVec[1][1] = g_Plane[0].plane.v.y;
+            planeVec[1][2] = g_Plane[0].plane.v.z;
+            planeVec[1][3] = g_Plane[0].plane.v.w;
+        }
+        if(ImGui::InputFloat4("v", planeVec[1])){
+            g_Plane[0].plane.v = mglm::vec4(planeVec[1][0], planeVec[1][1], planeVec[1][2], planeVec[1][3]);
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("获取u")){
+            g_Plane[0].plane.u = mglm::getOrthogonal(g_Plane[0].plane.v);
+            planeVec[0][0] = g_Plane[1].plane.v.x;
+            planeVec[0][1] = g_Plane[1].plane.v.y;
+            planeVec[0][2] = g_Plane[1].plane.v.z;
+            planeVec[0][3] = g_Plane[1].plane.v.w;
+        }
+        ImGui::Text("两个向量的点乘:%f", mglm::dot(g_Plane[0].plane.u, g_Plane[0].plane.v));
+        ImGui::Text("平面二:\nu:%f, %f, %f, %f\nv:%f, %f, %f, %f", g_Plane[1].plane.u.x, g_Plane[1].plane.u.y, g_Plane[1].plane.u.z, g_Plane[1].plane.u.w, g_Plane[1].plane.v.x, g_Plane[1].plane.v.y, g_Plane[1].plane.v.z, g_Plane[1].plane.v.w);
+        if(ImGui::Button("获取平面二")){
+            g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
+        }
+    }
+    static bool syncAngle;
     ImGui::Checkbox("同步角度", &syncAngle);
     if(ImGui::SliderFloat("平面一角度", &g_Plane[0].angle, 0, 360)){
         if(syncAngle){
@@ -352,13 +425,18 @@ void ShowRotate(){
     }
 }
 
-void UpdateImGui(VkCommandBuffer command){
+void UpdateImGui(vk::CommandBuffer command){
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     if(ImGui::BeginMainMenuBar()){
-        if(ImGui::BeginMenu("摄像机")){
-            if(ImGui::MenuItem("重置")){
-                g_Camera.UpdateUniform(g_VulkanDevice);
+        if(ImGui::BeginMenu("旋转")){
+            if(ImGui::MenuItem("自由")){
+                g_ImGuiInput.rotateMode.preset = false;
+                g_ImGuiInput.rotateMode.custom = true;
+            }
+            if(ImGui::MenuItem("预设")){
+                g_ImGuiInput.rotateMode.preset = true;
+                g_ImGuiInput.rotateMode.custom = false;
             }
             ImGui::EndMenu();
         }
@@ -379,18 +457,18 @@ void UpdateImGui(VkCommandBuffer command){
         }
         ShowRotate();
         ShowGeometry();
-        if(g_ImGuiInput.cylinder || g_ImGuiInput.font){
-            if(ImGui::InputFloat("半径", &g_ImGuiInput.parameter.radius)){
-                g_Geometry->Update(&g_ImGuiInput.parameter);
+        if(g_ImGuiInput.geometry.cylinder || g_ImGuiInput.geometry.font){
+            if(ImGui::InputFloat("半径", &g_ImGuiInput.geometry.parameter.radius)){
+                g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
             }
-            if(ImGui::InputFloat("采样率", &g_ImGuiInput.parameter.samples)){
-                g_Geometry->Update(&g_ImGuiInput.parameter);
+            if(ImGui::InputFloat("采样率", &g_ImGuiInput.geometry.parameter.samples)){
+                g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
             }
             for (size_t i = 0; i < 4; i++){
                 char label[0xff];
                 sprintf(label, "点%d", i);
-                if(ImGui::InputFloat4(label, g_ImGuiInput.parameter.point[i].data())){
-                    g_Geometry->Update(&g_ImGuiInput.parameter);
+                if(ImGui::InputFloat4(label, g_ImGuiInput.geometry.parameter.point[i].data())){
+                    g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
                 }
             }
         }
@@ -413,6 +491,9 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline[1]);
     }
     command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 0, g_Set, {});
+#ifdef ENABE_DEPTH_TEST
+    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 2, g_DepthTest.set, {});
+#endif
     vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
     if(g_ImGuiInput.fill){
         g_Geometry->Draw(command, g_Pipeline.layout);
@@ -421,9 +502,26 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
         g_Geometry->DrawWireframe(command, g_Pipeline.layout);
     }
 }
+#ifdef ENABE_DEPTH_TEST
+void ClearDepthMap(vk::CommandBuffer command){
+    vk::ClearColorValue clearColor = {};
+    clearColor.float32[0] = 1.0f;
+
+    vk::ImageSubresourceRange range{};
+    range.aspectMask = vk::ImageAspectFlagBits::eColor;
+    range.levelCount = 1;
+    range.layerCount = 1;
+    g_DepthTest.depth.SetLayout(command, vk::ImageLayout::eGeneral, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferWrite);
+    command.clearColorImage(g_DepthTest.depth.GetImage(), vk::ImageLayout::eGeneral, clearColor, range);
+}
+#endif
 void RecordCommand(vk::CommandBuffer command, vulkan::Image&color, vulkan::Image&depth){
     vulkan::framework::BeginCommands(command, vk::CommandBufferUsageFlagBits::eSimultaneousUse);
+#ifdef ENABE_DEPTH_TEST
+    ClearDepthMap(command);
+#endif
     vulkan::framework::BeginRendering(command, {&color}, {depth}, g_WindowWidth, g_WindowHeight);
+
     std::array pipeline = { g_Pipeline.fill,  g_Pipeline.wireframe };
     Draw(command, pipeline.data(), pipeline.size());
 
@@ -434,6 +532,9 @@ void RecordCommand(vk::CommandBuffer command, vulkan::Image&color, vulkan::Image
 }
 void RecordCommand(vk::CommandBuffer command, vk::Framebuffer frame, vk::RenderPass renderPass){
     vulkan::framework::BeginCommands(command, vk::CommandBufferUsageFlagBits::eSimultaneousUse);
+#ifdef ENABE_DEPTH_TEST
+    ClearDepthMap(command);
+#endif
     vulkan::framework::BeginRenderPass(command, frame, renderPass, g_WindowWidth, g_WindowHeight);
 
     std::array pipeline = { g_Pipeline.fill,  g_Pipeline.wireframe };
@@ -476,9 +577,14 @@ void DestroyGraphicsPipeline(vk::Device device){
     vkDestroyPipelineLayout(device, g_Pipeline.layout, VK_NULL_HANDLE);
 }
 void CreatePipelineLayout(vk::Device device){
-    auto info = vulkan::pipeline::initializers::pipelineLayoutCreateInfo(g_CameraSetLayout.size(), 1);
+    std::array setLayout = { g_CameraSetLayout[0], g_CameraSetLayout[1]
+#ifdef ENABE_DEPTH_TEST
+        ,g_DepthTest.setLayout
+#endif
+    };
+    auto info = vulkan::pipeline::initializers::pipelineLayoutCreateInfo(setLayout.size(), 1);
     auto pushConstantRange = vulkan::pipeline::initializers::pushConstantRange(vk::ShaderStageFlagBits::eVertex, sizeof(PushConstant), 0);
-    info.pSetLayouts = g_CameraSetLayout.data();
+    info.pSetLayouts = setLayout.data();
     info.pPushConstantRanges = &pushConstantRange;
     g_Pipeline.layout = device.createPipelineLayout(info);
 }
@@ -555,6 +661,24 @@ void CreateMVPUBO(const vulkan::Device&device){
     };
     vulkan::framework::UpdateDescriptorSets(device, bindings, {g_MvpUbo}, {}, g_Set[1]);
 }
+#ifdef ENABE_DEPTH_TEST
+void CreateDepthTestResource(const vulkan::Device&device){
+    vk::Extent3D size;
+    size.width = size.height = size.depth = 256;
+    g_DepthTest.depth.Create(device, size, vk::ImageUsageFlagBits::eStorage|vk::ImageUsageFlagBits::eTransferDst, vk::Format::eR32Sfloat);
+    g_DepthTest.depth.CreateView(device, vk::ImageViewType::e3D);
+
+    std::vector bindings = {
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eFragment)
+    };
+    g_DepthTest.set = g_VulkanPool.AllocateDescriptorSets(device, {g_DepthTest.setLayout})[0];
+    vulkan::framework::UpdateDescriptorSets(device, bindings, {}, {g_DepthTest.depth}, g_DepthTest.set);
+}
+void DestroyDepthTestResource(const vulkan::Device&device){
+    g_DepthTest.depth.Destroy(device);
+    device.GetDevice().destroyDescriptorSetLayout(g_DepthTest.setLayout);
+}
+#endif
 void DestoryMVPUBO(const vulkan::Device&device){
     g_MvpUbo.Destroy(device);
 }
@@ -567,6 +691,12 @@ void SetupDescriptorSetLayout(vk::Device device){
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex)
     };
     g_CameraSetLayout[1] = device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, mvp_bindings));
+#ifdef ENABE_DEPTH_TEST
+    std::array depth_test_bindings = {
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eFragment)
+    };
+    g_DepthTest.setLayout = device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, depth_test_bindings));
+#endif
 }
 void Setup(GLFWwindow *window){
     glfwSetKeyCallback(window, keybutton);
@@ -585,11 +715,16 @@ void Setup(GLFWwindow *window){
     g_Set = g_VulkanPool.AllocateDescriptorSets(g_VulkanDevice, g_CameraSetLayout);
 
     CreateMVPUBO(g_VulkanDevice);
-
+#ifdef ENABE_DEPTH_TEST
+    CreateDepthTestResource(g_VulkanDevice);
+#endif
     std::vector bindings = {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex)
     };
     vulkan::framework::UpdateDescriptorSets(g_VulkanDevice, bindings, { g_Camera.GetUniform() }, {}, g_Set[0]);
+
+    g_Plane[0].plane = mglm::planes::XY;
+    g_Plane[1].plane = mglm::planes::ZW;
 
     g_Geometry = new Tesseract;
     g_Geometry->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
@@ -618,11 +753,15 @@ void Setup(GLFWwindow *window){
 }
 
 void Cleanup(const vulkan::Device&device){
-    ImGui_ImplGlfw_Shutdown();
+    vk::Device dev = device;    
     g_VulkanImGui.Cleanup();
     DestoryMVPUBO(device);
+    ImGui_ImplGlfw_Shutdown();
+#ifdef ENABE_DEPTH_TEST
+    DestroyDepthTestResource(device);
+#endif
     for (size_t i = 0; i < g_CameraSetLayout.size(); i++){
-        device.GetDevice().destroyDescriptorSetLayout(g_CameraSetLayout[i]);
+        dev.destroyDescriptorSetLayout(g_CameraSetLayout[i]);
     }
     vulkan::pipeline::tools::destroyPipelineCache(device, "GraphicsPipelineCache", g_Pipeline.cache);
     g_Geometry->Cleanup();
@@ -650,56 +789,62 @@ void RecreateSwapchain(void *userData){
 }
 void display(GLFWwindow* window){
     g_VulkanDevice.waitIdle();
-    if(g_ImGuiInput.UpdateGeometry){
-        g_ImGuiInput.UpdateGeometry = false;
+    if(g_ImGuiInput.geometry.UpdateGeometry){
+        g_ImGuiInput.geometry.UpdateGeometry = false;
         g_Geometry->Cleanup();
         delete g_Geometry;
-        if(g_ImGuiInput.tesseract){
+        if(g_ImGuiInput.geometry.tesseract){
             g_Geometry = new Tesseract;
         }
-        else if(g_ImGuiInput.sphere){
+        else if(g_ImGuiInput.geometry.sphere){
             g_Geometry = new Sphere;
         }
-        else if(g_ImGuiInput.pentatope){
+        else if(g_ImGuiInput.geometry.pentatope){
             g_Geometry = new Pentatope;
         }
-        else if(g_ImGuiInput.hexadeca){
+        else if(g_ImGuiInput.geometry.hexadeca){
             g_Geometry = new Hexadeca;
         }
-        else if(g_ImGuiInput.icositetra){
+        else if(g_ImGuiInput.geometry.icositetra){
             g_Geometry = new Icositetra;
         }
-        else if(g_ImGuiInput.clifford){
+        else if(g_ImGuiInput.geometry.clifford){
             g_Geometry = new Clifford;
         }
-        else if(g_ImGuiInput.font){
+        else if(g_ImGuiInput.geometry.font){
             g_Geometry = new Font;
         }
-        else if(g_ImGuiInput.cylinder){
+        else if(g_ImGuiInput.geometry.torus){
+            g_Geometry = new Torus;
+        }
+        else if(g_ImGuiInput.geometry.cylinder){
+            g_Geometry = new Cylinder;
+        }
+        else if(g_ImGuiInput.geometry.pipeline){
             g_Geometry = new Pipeline;
         }
-        else if(g_ImGuiInput.kleinBottle){
+        else if(g_ImGuiInput.geometry.kleinBottle){
             g_Geometry = new KleinBottle;
         }
-        else if(g_ImGuiInput.grid3d){
+        else if(g_ImGuiInput.geometry.grid3d){
             g_Geometry = new Grid3D;
         }
-        else if(g_ImGuiInput.grid4d){
+        else if(g_ImGuiInput.geometry.grid4d){
             g_Geometry = new Grid4D;
         }
-        else if(g_ImGuiInput.spherinder){   
+        else if(g_ImGuiInput.geometry.spherinder){   
             g_Geometry = new Spherinder;
         }
-        else if(g_ImGuiInput.hypersphere){
+        else if(g_ImGuiInput.geometry.hypersphere){
             g_Geometry = new Hypersphere;
         }
 #ifdef DEBUG
-        else if(g_ImGuiInput.testGeometry){
+        else if(g_ImGuiInput.geometry.testGeometry){
             g_Geometry = new GeometryTest;
         }
 #endif
         g_Geometry->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
-        g_Geometry->Update(&g_ImGuiInput.parameter);
+        g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
         UpdateUniform(g_VulkanDevice);
     }
     if(g_VulkanDevice.IsEnableDynamicRendering()){
@@ -730,6 +875,7 @@ void SetupVulkan(GLFWwindow *window){
     // volkLoadInstance(g_VulkanDevice.GetInstance());
     g_VulkanDevice.SelectPhysicalDevice(SelectPhysicalDevice);
     g_VulkanDevice.EnableDynamicRendering();
+    g_VulkanDevice.EnableFragmentStoresAndAtomics();
     VkSurfaceKHR surface;
     glfwCreateWindowSurface(g_VulkanDevice.GetInstance(), window, nullptr, &surface);
     g_VulkanRenderer.SetSurface(surface);

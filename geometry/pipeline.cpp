@@ -200,7 +200,7 @@ void Pipeline::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layou
 void Pipeline::Update(const void *useData){
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
-    CylinderParameter parameter = *(CylinderParameter *)useData;
+    PipelineParameter parameter = *(PipelineParameter *)useData;
     generateCurvedCylinder(vertices, indices,
         mglm::vec4(parameter.point[0][0], parameter.point[0][1], parameter.point[0][2], parameter.point[0][3]),
         mglm::vec4(parameter.point[1][0], parameter.point[1][1], parameter.point[1][2], parameter.point[1][3]),
@@ -247,7 +247,7 @@ void Font::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
 void Font::Update(const void *useData){
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
-    CylinderParameter parameter = *(CylinderParameter *)useData;
+    PipelineParameter parameter = *(PipelineParameter *)useData;
     generateCurvedCylinder(vertices, indices,
         glm::vec3(parameter.point[0][0], parameter.point[0][1], parameter.point[0][2]),
         glm::vec3(parameter.point[1][0], parameter.point[1][1], parameter.point[1][2]),

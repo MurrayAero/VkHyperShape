@@ -165,7 +165,7 @@ namespace vulkan{
         return command;
     }
     vk::ImageLayout Image::Copy(vk::CommandBuffer command, const Buffer& srcBuffer, vk::ImageLayout dstLayout, vk::PipelineStageFlags dstStage, vk::AccessFlags dstAccess, uint32_t imageCount){
-        const uint32_t imageSize = size.width * size.height * pixelSize;
+        const uint32_t imageSize = size.width * size.height * size.depth * pixelSize;
         SetLayout(command, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferWrite);
         std::vector<vk::BufferImageCopy> bufferCopyRegions(imageCount);
         for (size_t i = 0; i < imageCount; ++i) {
@@ -194,9 +194,9 @@ namespace vulkan{
         pool.FreeCommandBuffers(device, command);
     }
     void Image::Copy(vk::CommandBuffer command, Image&src) {
-        assert(format     == src.format);
-        assert(mipLevels  == src.mipLevels);
-        assert(size.width == src.size.width && size.height== src.size.height);
+        assert(format == src.format);
+        assert(mipLevels == src.mipLevels);
+        assert(size.width == src.size.width && size.height== src.size.height && size.height == src.size.height);
 
         const uint32_t layerCount = arrayLayer;
         src.SetLayout(command, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferRead);

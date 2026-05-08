@@ -88,8 +88,6 @@ namespace mglm{
         }
         mat5 operator*(const mat5& o) const {
             mat5 result;
-            // result[col][row] = sum_k this[k][row] * o[col][k]
-            // 即 result 的第 col 列 = this * (o 的第 col 列)
             for (int col = 0; col < 5; ++col) {
                 result[col] = (*this) * o[col];
             }
@@ -172,7 +170,30 @@ namespace mglm{
             return *this;
         }
     };
-    
+    struct Plane {
+        vec4 u;
+        vec4 v;
+        Plane()=default;
+        Plane(const vec4& u, const vec4& v) : u(u), v(v) {}
+
+        bool operator==(const Plane&plane)const noexcept{
+            return u == plane.u && v == plane.v;
+        }
+        Plane orthonormalize() const noexcept{
+            vec4 newU = normalize(u);
+            // v在newU上的投影 = dot(v, newU) * newU
+            vec4 newV = v - dot(v, newU) * newU;
+            return Plane(newU, normalize(newV));
+        }
+    };
+    namespace planes {
+        const Plane XY(vec4(1,0,0,0), vec4(0,1,0,0));
+        const Plane XZ(vec4(1,0,0,0), vec4(0,0,1,0));
+        const Plane XW(vec4(1,0,0,0), vec4(0,0,0,1));
+        const Plane YZ(vec4(0,1,0,0), vec4(0,0,1,0));
+        const Plane YW(vec4(0,1,0,0), vec4(0,0,0,1));
+        const Plane ZW(vec4(0,0,1,0), vec4(0,0,0,1));
+    }
     template<typename VecType>
     inline VecType operator*(float s, const VecType& v) { return v * s; }
 
@@ -309,6 +330,59 @@ namespace mglm{
             }
         }
         return inv;
+    }
+    inline vec4 getOrthogonal(const vec4& v) {
+        vec4 u(0.0f);
+        vec4 av = abs(v);
+        
+        int k = 0;
+        if (av[1] > av[k]) k = 1;
+        if (av[2] > av[k]) k = 2;
+        if (av[3] > av[k]) k = 3;
+        
+        int k1 = (k == 0) ? 1 : 0;
+        
+        u[k] = -v[k1];
+        u[k1] = v[k];
+        return u;
+    }
+
+    inline vec5 getOrthogonal(const vec5& v) {
+        vec5 u(0.0f);
+        vec5 av = abs(v);
+        
+        int k = 0;
+        if (av[1] > av[k]) k = 1;
+        if (av[2] > av[k]) k = 2;
+        if (av[3] > av[k]) k = 3;
+        if (av[4] > av[k]) k = 4;
+        
+        int k1 = (k == 0) ? 1 : 0;
+        
+        u[k] = -v[k1];
+        u[k1] = v[k];
+        return u;
+    }
+    inline Plane getOrthogonalPlane(const Plane& p) {
+        vec4 e[4];
+        uint32_t count = 0;
+        
+        vec4 candidates[6] = { 
+            p.u, p.v, 
+            vec4(1, 0, 0, 0), vec4(0, 1, 0, 0), 
+            vec4(0, 0, 1, 0), vec4(0, 0, 0, 1) 
+        };        
+        for (int i = 0; i < 6 && count < 4; ++i) {
+            vec4 temp = candidates[i];
+            for (int j = 0; j < count; ++j) {
+                temp = temp - dot(temp, e[j]) * e[j];
+            }
+            if (length(temp) > 1e-6f) {
+                e[count] = normalize(temp);
+                count++;
+            }
+        }
+        return Plane(e[2], e[3]);
     }
 
 }

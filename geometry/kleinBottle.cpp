@@ -43,7 +43,7 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
         }
     }
 }
-// void KleinBottle::Generate(std::vector<uint16_t>&indices, std::vector<Vertex>&vertices, int uRes, int vRes) {
+// void Generate(std::vector<uint16_t>&indices, std::vector<Vertex>&vertices, int uRes, int vRes) {
 //     Vertex vert;
 //     for (int i = 0; i <= uRes; i++) {
 //         float u = glm::two_pi<float>() * i / uRes;
@@ -52,11 +52,11 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
 //             float v = glm::two_pi<float>() * j / vRes;
 //             if (u < M_PI) {
 //                 float scale = 4.0f * (1.0f - cos(u)/2.0f);
-//                 float w = scale * sin(v);  // v=0 时 w=0, v=π/2 时 w=+scale, v=π 时 w=0, v=3π/2 时 w=-scale
+//                 // float w = scale * sin(v);  // v=0 时 w=0, v=π/2 时 w=+scale, v=π 时 w=0, v=3π/2 时 w=-scale
 //                 vert.pos = glm::vec4(6.0f * cos(u) * (1.0f + sin(u)) + 4.0f * (1.0f - cos(u)/2.0f) * cos(u) * cos(v),
 //                 16.0f * sin(u) + 4.0f * (1.0f - cos(u)/2.0f) * sin(u) * cos(v), 
 //                 4.0f * (1.0f - cos(u)/2.0f) * sin(v), 0);
-//                 vert.color = glm::vec3(0, 1, 0);
+//                 vert.color = glm::vec3(0);
 //             } else {
 //                 vert.pos = glm::vec4(6.0f * cos(u) * (1.0f + sin(u)) - 4.0f * (1.0f - cos(u)/2.0f) * cos(v), 
 //                 16.0f * sin(u), 
@@ -105,7 +105,6 @@ void KleinBottle::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout la
 void KleinBottle::Update(const void *useData){
     std::vector<Vertex>vertices;
     std::vector<uint16_t>indices;
-    // generate(vertices, indices);
     GenerateKleinBottle(vertices, indices);
     if(!mKleinBottle.IsVaildIndex() || !mKleinBottle.IsVaildVertex()){
         mKleinBottle.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);

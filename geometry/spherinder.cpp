@@ -31,9 +31,13 @@ std::vector<Vertex> GenerateSpherinderVertices(uint32_t stacksCount, uint32_t sl
     return vertices;
 }
 
+
 std::vector<uint16_t> GenerateSpherinderIndices(uint32_t stacksCount, uint32_t slicesCount) {
     std::vector<uint16_t> indices;
+    if (stacksCount < 2 || slicesCount < 3) return indices;
+
     uint32_t vertsPerSphere = 2 + (stacksCount - 1) * slicesCount;
+    if (vertsPerSphere * 2 > 65535) return indices;
 
     uint16_t bottomNorth = 0;
     uint16_t bottomSouth = static_cast<uint16_t>(vertsPerSphere - 1);
@@ -42,14 +46,13 @@ std::vector<uint16_t> GenerateSpherinderIndices(uint32_t stacksCount, uint32_t s
     uint16_t topSouth    = static_cast<uint16_t>(topOffset + vertsPerSphere - 1);
 
     auto bottomIdx = [&](uint32_t i, uint32_t j) -> uint16_t {
-        // i: [1, stacksCount-1], j 自动取模
         return static_cast<uint16_t>(1 + (i - 1) * slicesCount + (j % slicesCount));
     };
     auto topIdx = [&](uint32_t i, uint32_t j) -> uint16_t {
         return static_cast<uint16_t>(topOffset + 1 + (i - 1) * slicesCount + (j % slicesCount));
     };
 
-    // ---------- 底部球面 ----------
+    // ==================== 底部球面 ====================
     for (uint32_t j = 0; j < slicesCount; ++j) {
         indices.push_back(bottomNorth);
         indices.push_back(bottomIdx(1, j));
@@ -71,7 +74,7 @@ std::vector<uint16_t> GenerateSpherinderIndices(uint32_t stacksCount, uint32_t s
         indices.push_back(bottomIdx(stacksCount - 1, j));
     }
 
-    // ---------- 顶部球面 ----------
+    // ==================== 顶部球面 ====================
     for (uint32_t j = 0; j < slicesCount; ++j) {
         indices.push_back(topNorth);
         indices.push_back(topIdx(1, j));
@@ -93,20 +96,22 @@ std::vector<uint16_t> GenerateSpherinderIndices(uint32_t stacksCount, uint32_t s
         indices.push_back(topIdx(stacksCount - 1, j));
     }
 
-    // ---------- 侧面 (S² × I 的柱面壁) ----------
-    // 北极附近
+    // ==================== 侧面（柱面壁）====================
+    // 北极帽：从北极线 (bottomNorth–topNorth) 过渡到第一层环
     for (uint32_t j = 0; j < slicesCount; ++j) {
+        uint16_t b = bottomIdx(1, j);
+        uint16_t t = topIdx(1, j);
+        // bottomNorth -> topIdx(1,j) -> bottomIdx(1,j)
         indices.push_back(bottomNorth);
-        indices.push_back(topIdx(1, j));
-        indices.push_back(topIdx(1, j + 1));
-    }
-    for (uint32_t j = 0; j < slicesCount; ++j) {
+        indices.push_back(t);
+        indices.push_back(b);
+        // bottomNorth -> topNorth -> topIdx(1,j)
+        indices.push_back(bottomNorth);
         indices.push_back(topNorth);
-        indices.push_back(bottomIdx(1, j + 1));
-        indices.push_back(bottomIdx(1, j));
+        indices.push_back(t);
     }
 
-    // 中间各层环
+    // 中间柱面：逐层四边形条带连接上下球面对应环
     for (uint32_t i = 1; i < stacksCount; ++i) {
         for (uint32_t j = 0; j < slicesCount; ++j) {
             uint16_t a = bottomIdx(i, j);
@@ -118,16 +123,18 @@ std::vector<uint16_t> GenerateSpherinderIndices(uint32_t stacksCount, uint32_t s
         }
     }
 
-    // 南极附近
+    // 南极帽：从最后一层环过渡到南极线 (bottomSouth–topSouth)
     for (uint32_t j = 0; j < slicesCount; ++j) {
+        uint16_t b = bottomIdx(stacksCount - 1, j);
+        uint16_t t = topIdx(stacksCount - 1, j);
+        // bottomSouth -> bottomIdx(stacksCount-1,j) -> topIdx(stacksCount-1,j)
         indices.push_back(bottomSouth);
-        indices.push_back(topIdx(stacksCount - 1, j));
-        indices.push_back(topIdx(stacksCount - 1, j + 1));
-    }
-    for (uint32_t j = 0; j < slicesCount; ++j) {
+        indices.push_back(b);
+        indices.push_back(t);
+        // bottomSouth -> topIdx(stacksCount-1,j) -> topSouth
+        indices.push_back(bottomSouth);
+        indices.push_back(t);
         indices.push_back(topSouth);
-        indices.push_back(bottomIdx(stacksCount - 1, j + 1));
-        indices.push_back(bottomIdx(stacksCount - 1, j));
     }
 
     return indices;
@@ -135,7 +142,11 @@ std::vector<uint16_t> GenerateSpherinderIndices(uint32_t stacksCount, uint32_t s
 
 std::vector<uint16_t> GenerateSpherinderWireframe(uint32_t stacksCount, uint32_t slicesCount) {
     std::vector<uint16_t> indices;
+    if (stacksCount < 2 || slicesCount < 3) return indices;
+
     uint32_t vertsPerSphere = 2 + (stacksCount - 1) * slicesCount;
+    if (vertsPerSphere * 2 > 65535) return indices;
+
     uint16_t bottomNorth = 0;
     uint16_t bottomSouth = static_cast<uint16_t>(vertsPerSphere - 1);
     uint16_t topOffset   = static_cast<uint16_t>(vertsPerSphere);
@@ -187,7 +198,7 @@ std::vector<uint16_t> GenerateSpherinderWireframe(uint32_t stacksCount, uint32_t
         }
     }
 
-    // 侧面：沿 w 轴连接对应顶点
+    // 侧面母线（沿 w 方向）
     indices.push_back(bottomNorth);
     indices.push_back(topNorth);
     for (uint32_t i = 1; i < stacksCount; ++i) {

@@ -1,7 +1,7 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 #include "geometry.h"
-struct CylinderParameter{
+struct PipelineParameter{
     float radius = .015;
     float samples = 20;
     uint32_t segments = 16;
