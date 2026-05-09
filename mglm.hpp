@@ -170,30 +170,6 @@ namespace mglm{
             return *this;
         }
     };
-    struct Plane {
-        vec4 u;
-        vec4 v;
-        Plane()=default;
-        Plane(const vec4& u, const vec4& v) : u(u), v(v) {}
-
-        bool operator==(const Plane&plane)const noexcept{
-            return u == plane.u && v == plane.v;
-        }
-        Plane orthonormalize() const noexcept{
-            vec4 newU = normalize(u);
-            // v在newU上的投影 = dot(v, newU) * newU
-            vec4 newV = v - dot(v, newU) * newU;
-            return Plane(newU, normalize(newV));
-        }
-    };
-    namespace planes {
-        const Plane XY(vec4(1,0,0,0), vec4(0,1,0,0));
-        const Plane XZ(vec4(1,0,0,0), vec4(0,0,1,0));
-        const Plane XW(vec4(1,0,0,0), vec4(0,0,0,1));
-        const Plane YZ(vec4(0,1,0,0), vec4(0,0,1,0));
-        const Plane YW(vec4(0,1,0,0), vec4(0,0,0,1));
-        const Plane ZW(vec4(0,0,1,0), vec4(0,0,0,1));
-    }
     template<typename VecType>
     inline VecType operator*(float s, const VecType& v) { return v * s; }
 
@@ -346,7 +322,6 @@ namespace mglm{
         u[k1] = v[k];
         return u;
     }
-
     inline vec5 getOrthogonal(const vec5& v) {
         vec5 u(0.0f);
         vec5 av = abs(v);
@@ -363,9 +338,34 @@ namespace mglm{
         u[k1] = v[k];
         return u;
     }
+    struct Plane {
+        vec4 u;
+        vec4 v;
+        Plane()=default;
+        Plane(const vec4& u, const vec4& v) : u(u), v(v) {}
+
+        bool operator==(const Plane&plane)const noexcept{
+            return u == plane.u && v == plane.v;
+        }
+        Plane orthonormalize() const noexcept{
+            vec4 newU = normalize(u);
+            // v在newU上的投影 = dot(v, newU) * newU
+            vec4 newV = v - dot(v, newU) * newU;
+            return Plane(newU, normalize(newV));
+        }
+    };
+    namespace planes {
+        const Plane XY(vec4(1,0,0,0), vec4(0,1,0,0));
+        const Plane XZ(vec4(1,0,0,0), vec4(0,0,1,0));
+        const Plane XW(vec4(1,0,0,0), vec4(0,0,0,1));
+        const Plane YZ(vec4(0,1,0,0), vec4(0,0,1,0));
+        const Plane YW(vec4(0,1,0,0), vec4(0,0,0,1));
+        const Plane ZW(vec4(0,0,1,0), vec4(0,0,0,1));
+    }
+
     inline Plane getOrthogonalPlane(const Plane& p) {
         vec4 e[4];
-        uint32_t count = 0;
+        int count = 0;
         
         vec4 candidates[6] = { 
             p.u, p.v, 
@@ -384,6 +384,18 @@ namespace mglm{
         }
         return Plane(e[2], e[3]);
     }
-
+    //结果除以2,映射到[0, 1], 就类似dot
+    //0:完全正交,1:交于一条直线,2:完全重合
+    inline float subspaceDot(const Plane& p, const Plane& p1) {
+        Plane op = p.orthonormalize();
+        Plane op1 = p1.orthonormalize();
+        // 计算 U^T V 矩阵的四个元素
+        float m00 = dot(op.u, op1.u);
+        float m01 = dot(op.u, op1.v);
+        float m10 = dot(op.v, op1.u);
+        float m11 = dot(op.v, op1.v);
+        // 返回 ||U^T V||_F^2 (Frobenius 范数的平方)
+        return m00 * m00 + m01 * m01 + m10 * m10 + m11 * m11;
+    }
 }
 #endif

@@ -60,8 +60,8 @@ struct ImGuiInput{
 #ifdef DEBUG
     bool testGeometry = false;
 #endif
-        bool UpdateGeometry = false;
-        PipelineParameter parameter;
+        bool Update = false;
+        UseData parameter;
         void UnSelect(){
             memset(this, 0, sizeof(*this));
         }
@@ -69,83 +69,83 @@ struct ImGuiInput{
         void SeletctTestGeometry(){
             UnSelect();
             testGeometry = true;
-            UpdateGeometry = true;
+            Update = true;
         }
 #endif
         void SelectTesseract(){
             UnSelect();
             tesseract = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectSphere(){
             UnSelect();
             sphere = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectTorus(){
             UnSelect();
             torus = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectPentatope(){
             UnSelect();
             pentatope = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectIcositetra(){
             UnSelect();
             icositetra = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectPipeline(){
             UnSelect();
             pipeline = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectCylinder(){
             UnSelect();
             cylinder = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectClifford(){
             UnSelect();
             clifford = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectHexadeca(){
             UnSelect();
             hexadeca = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectKleinBottle(){
             UnSelect();
             kleinBottle = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectCylindrical(){
             UnSelect();
             spherinder = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectGrid3D(){
             UnSelect();
             grid3d = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectGrid4D(){
             UnSelect();
             grid4d = true;
-            UpdateGeometry = true;
+            Update = true;
         }
         void SelectHypersphere(){
             UnSelect();
             hypersphere = true;
-            UpdateGeometry = true;        
+            Update = true;        
         }
         void SelectFont(){
             UnSelect();
             font = true;
-            UpdateGeometry = true;
+            Update = true;
         }
     }geometry;
     struct{
@@ -457,6 +457,11 @@ void UpdateImGui(vk::CommandBuffer command){
         }
         ShowRotate();
         ShowGeometry();
+        if(g_ImGuiInput.geometry.clifford){
+            if(ImGui::SliderFloat("时间", &g_ImGuiInput.geometry.parameter.cliffordTime, 0, 1)){
+                g_ImGuiInput.geometry.Update = true;
+            }
+        }
         if(g_ImGuiInput.geometry.cylinder || g_ImGuiInput.geometry.font){
             if(ImGui::InputFloat("半径", &g_ImGuiInput.geometry.parameter.radius)){
                 g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
@@ -789,8 +794,8 @@ void RecreateSwapchain(void *userData){
 }
 void display(GLFWwindow* window){
     g_VulkanDevice.waitIdle();
-    if(g_ImGuiInput.geometry.UpdateGeometry){
-        g_ImGuiInput.geometry.UpdateGeometry = false;
+    if(g_ImGuiInput.geometry.Update){
+        g_ImGuiInput.geometry.Update = false;
         g_Geometry->Cleanup();
         delete g_Geometry;
         if(g_ImGuiInput.geometry.tesseract){
@@ -875,7 +880,9 @@ void SetupVulkan(GLFWwindow *window){
     // volkLoadInstance(g_VulkanDevice.GetInstance());
     g_VulkanDevice.SelectPhysicalDevice(SelectPhysicalDevice);
     g_VulkanDevice.EnableDynamicRendering();
+#ifdef ENABLE_DEPTH_TEST
     g_VulkanDevice.EnableFragmentStoresAndAtomics();
+#endif
     VkSurfaceKHR surface;
     glfwCreateWindowSurface(g_VulkanDevice.GetInstance(), window, nullptr, &surface);
     g_VulkanRenderer.SetSurface(surface);

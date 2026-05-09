@@ -13,6 +13,14 @@
 #include "../vulkan/framework.hpp"
 //该宏作用:如果val比alignment小，则返回alignment，否则如果val大于alignment但小于alignment*2则返回alignment*2以此类推
 #define ALIGN(val, alignment)((val + alignment - 1) & ~(alignment - 1))
+struct UseData{
+    float radius = .015;
+    float samples = 20;
+    float cliffordTime = 0;
+    uint32_t segments = 16;
+    //这样写能直接传给imgui
+    std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
+};
 struct Vertex {
     glm::vec4 pos;
     glm::vec3 color;

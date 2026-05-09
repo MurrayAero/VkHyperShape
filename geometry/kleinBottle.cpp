@@ -15,7 +15,7 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
             float z = b * sinf(v) * cosf(half_u);
             float w = b * sinf(v) * sinf(half_u);
 
-            float pseudo_normal_z = sinf(v) * cosf(half_u); 
+            float pseudo_normal_z = sinf(v) * cosf(half_u);
 
             float color_blend = pseudo_normal_z * 0.5f + 0.5f;
 
@@ -25,7 +25,7 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
             glm::vec3 final_color = glm::mix(color_inside, color_outside, color_blend);
             
             vertices.push_back(Vertex(
-                glm::vec4(x, y, z, w), 
+                glm::vec4(x , y, z, w), 
                 final_color
             ));
         }

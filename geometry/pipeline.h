@@ -1,13 +1,6 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 #include "geometry.h"
-struct PipelineParameter{
-    float radius = .015;
-    float samples = 20;
-    uint32_t segments = 16;
-    //这样写能直接传给imgui
-    std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
-};
 class Pipeline:public Geometry{
     vulkan::Primitive mGeometry;
     vulkan::Primitive mWireframe;

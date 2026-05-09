@@ -8,7 +8,6 @@
 namespace mglm{
     inline mat5 rotate(float angle, const Plane& plane) {
         Plane p = plane.orthonormalize();
-
         vec4 u = p.u, v = p.v;
         mat5 I = mglm::mat5(1.0f);
         float c = std::cos(angle), s = std::sin(angle);        
