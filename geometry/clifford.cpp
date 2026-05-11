@@ -21,113 +21,71 @@ std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t v
 
     return vertices;
 }
-// std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t vSegments, float t) {
-//     std::vector<Vertex> vertices;
-//     vertices.reserve(uSegments * vSegments);
-//     const float PI2 = glm::two_pi<float>();
-//     const float SQRT2_INV = 0.70710678f;
-//     const float target_theta = glm::quarter_pi<float>(); // pi/4
-//     const float hopf_amp1 = cosf(target_theta / 2.0f);
-//     const float hopf_amp2 = sinf(target_theta / 2.0f);
-//     for (uint32_t i = 0; i < uSegments; ++i) {
-//         float u = PI2 * float(i) / float(uSegments);
-//         for (uint32_t j = 0; j < vSegments; ++j) {
-//             float v = PI2 * float(j) / float(vSegments);
-//             // 1. Clifford 环面 (t=0) - 对应赤道 (Theta = pi/2)
-//             glm::vec4 clifford(
-//                 SQRT2_INV * cosf(u + v),
-//                 SQRT2_INV * sinf(u + v),
-//                 SQRT2_INV * cosf(v),
-//                 SQRT2_INV * sinf(v)
-//             );
-//             // 2. Hopf 环面 (t=1) - 对应某一纬度 (Theta = target_theta)
-//             glm::vec4 hopf(
-//                 hopf_amp1 * cosf(u + v),
-//                 hopf_amp1 * sinf(u + v),
-//                 hopf_amp2 * cosf(v),
-//                 hopf_amp2 * sinf(v)
-//             );
-//             // 3. Quaternion 转换 + Slerp
-//             glm::quat clifford_quat(clifford.w, clifford.x, clifford.y, clifford.z);
-//             glm::quat hopf_quat(hopf.w, hopf.x, hopf.y, hopf.z);
-//             // 【关键修改3】保证四元数走短弧插值 (防止网格在插值时扭结翻转)
-//             if (glm::dot(clifford_quat, hopf_quat) < 0.0f) {
-//                 hopf_quat = -hopf_quat;
-//             }
-//             clifford_quat = glm::normalize(clifford_quat);
-//             hopf_quat = glm::normalize(hopf_quat);
-//             glm::quat result_quat;
-//             if (t <= 0.0f) {
-//                 result_quat = clifford_quat;
-//             } else if (t >= 1.0f) {
-//                 result_quat = hopf_quat;
-//             } else {
-//                 result_quat = glm::slerp(clifford_quat, hopf_quat, t);
-//             }
-//             glm::vec4 pos(result_quat.x, result_quat.y, result_quat.z, result_quat.w);
-//             glm::vec3 color(cosf(u) * 0.5f + 0.5f, sinf(v) * 0.5f + 0.5f, 1.0f);
-//             vertices.emplace_back(pos, color);
-//         }
-//     }
-//     return vertices;
-// }
 std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t vSegments, float t) {
     std::vector<Vertex> vertices;
     vertices.reserve(uSegments * vSegments);
 
-    const float PI2 = glm::two_pi<float>();
-    const float SQRT2_INV = 0.70710678f;
+    int lobeCount = 3;
+    float lobeDepth = t * 0.4f;
 
     for (uint32_t i = 0; i < uSegments; ++i) {
-        float u = PI2 * float(i) / float(uSegments);
+        float u = glm::two_pi<float>() * float(i) / float(uSegments);
         
+        // === S² 上的曲线插值 ===
+        // t=0: 赤道大圆 (Clifford 对应的 S² 曲线)
+        // t=1: 变形曲线 (Hopf torus)
+        
+        // 基曲线（大圆方向）
+        glm::vec3 p_base(0.0f, cosf(u), sinf(u));
+        
+        // 变形曲线(带 lobe)
+        float envelope = cosf(lobeDepth * cosf(lobeCount * u));
+        glm::vec3 p_hopf(sinf(lobeDepth * cosf(lobeCount * u)), 
+                         cosf(u) * envelope, 
+                         sinf(u) * envelope);
+        
+        // 在 S² 上 slerp（用 glm::normalize + dot 检查）
+        float dp = glm::dot(p_base, p_hopf);
+        if (dp < 0.0f) p_hopf = -p_hopf;
+        
+        float angle = acosf(glm::clamp(glm::dot(p_base, p_hopf), -1.0f, 1.0f));
+        glm::vec3 p_s2;
+        if (angle < 0.001f) {
+            p_s2 = p_base;
+        } else {
+            float sinAngle = sinf(angle);
+            p_s2 = (sinf((1.0f - t) * angle) / sinAngle) * p_base 
+                 + (sinf(t * angle) / sinAngle) * p_hopf;
+        }
+
+        // === Hopf 提升 ===
+        // p_s2 = (p1, p2, p3)，构造水平提升 y(u)
+        float yden = sqrtf(2.0f * (1.0f + p_s2.x));
+        float y1 = (1.0f + p_s2.x) / yden;
+        float y2 = p_s2.y / yden;
+        float y3 = p_s2.z / yden;
+
         for (uint32_t j = 0; j < vSegments; ++j) {
-            // 统一使用 v ∈ [0, 4π]
-            float v = 4.0f * PI2 * float(j) / float(vSegments);
-            
-            // 1. Clifford (t=0) - 调整公式以适应 v ∈ [0, 4π]
-            // 为了让 Clifford 在 v ∈ [0, 4π] 时形状不变，我们需要将 v 减半
-            float v_clifford = v * 0.5f; // v_clifford ∈ [0, 2π]
-            glm::vec4 clifford(
-                SQRT2_INV * cosf(u),
-                SQRT2_INV * sinf(u),
-                SQRT2_INV * cosf(v_clifford),  // 使用 v_clifford
-                SQRT2_INV * sinf(v_clifford)   // 使用 v_clifford
+            float v = glm::two_pi<float>() * float(j) / float(vSegments);
+            float cosv = cosf(v);
+            float sinv = sinf(v);
+
+            // e^(i*v) * y(u) 作为四元数乘法
+            glm::vec4 pos(
+                cosv * y1,                    // w
+                sinv * y1,                    // x  
+                cosv * y2 - sinv * y3,        // y
+                cosv * y3 + sinv * y2         // z
+            );
+            glm::vec3 color(
+                cosf(u) * 0.5f + 0.5f,
+                sinf(v) * 0.5f + 0.5f,
+                glm::mix(1.0f, 0.8f, t)
             );
 
-            // 2. Hopf (t=1) - 使用完整的 v ∈ [0, 4π]
-            float halfV = v * 0.5f;  // halfV ∈ [0, 2π]
-            glm::vec4 hopf(
-                cosf(halfV) * cosf(u),
-                cosf(halfV) * sinf(u),
-                sinf(halfV) * cosf(u),
-                sinf(halfV) * sinf(u)
-            );
-
-            // 3. Quaternion 转换 + Slerp
-            glm::quat clifford_quat(clifford.w, clifford.x, clifford.y, clifford.z);
-            glm::quat hopf_quat(hopf.w, hopf.x, hopf.y, hopf.z);
-
-            clifford_quat = glm::normalize(clifford_quat);
-            hopf_quat = glm::normalize(hopf_quat);
-
-            glm::quat result_quat;
-            if (t <= 0.0f) {
-                result_quat = clifford_quat;
-            } else if (t >= 1.0f) {
-                result_quat = hopf_quat;
-            } else {
-                result_quat = glm::slerp(clifford_quat, hopf_quat, t);
-            }
-
-            glm::vec4 pos(result_quat.x, result_quat.y, result_quat.z, result_quat.w);
-
-            glm::vec3 color(cosf(u) * 0.5f + 0.5f, sinf(v) * 0.5f + 0.5f, 1.0f);
-            
             vertices.emplace_back(pos, color);
         }
     }
-    
     return vertices;
 }
 std::vector<uint16_t> generateCliffordTorusWireframeIndices(uint32_t uSegments, uint32_t vSegments){
