@@ -3,6 +3,7 @@ layout(location = 0) in vec4 inPos;
 layout(location = 1) in vec3 inColor;
 
 layout(location = 0) out vec3 outColor;
+layout(location = 1) out float v_clip_v;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
@@ -46,10 +47,11 @@ vec4 mvp_vec_transform(vec4 pos){
     float point[5], inpos[5] = float[5](pos.x, pos.y, pos.z, pos.w, 1.0f);
     mvp_transform(mvpubo.projection, mvpubo.view, mvpubo.model, mvp);
     mat_vec_mul(mvp, inpos, point);
-    return vec4(point[0], point[1], point[2], point[3]);
+    return vec4(point[0], point[1], point[2], point[3]) / point[4];
 }
 void main() {
     outColor = inColor;
     vec4 point = mvp_vec_transform(inPos);
-	gl_Position = pc.projection * ubo.view * point;
+    v_clip_v = point.w;
+	gl_Position = pc.projection * ubo.view * vec4(vec3(point), 1.0f);
 }

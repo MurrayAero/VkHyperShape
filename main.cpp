@@ -60,8 +60,6 @@ struct ImGuiInput{
 #ifdef DEBUG
     bool testGeometry = false;
 #endif
-        bool Update = false;
-        UseData parameter;
         void UnSelect(){
             memset(this, 0, sizeof(*this));
         }
@@ -69,83 +67,67 @@ struct ImGuiInput{
         void SeletctTestGeometry(){
             UnSelect();
             testGeometry = true;
-            Update = true;
         }
 #endif
         void SelectTesseract(){
             UnSelect();
             tesseract = true;
-            Update = true;
         }
         void SelectSphere(){
             UnSelect();
             sphere = true;
-            Update = true;
         }
         void SelectTorus(){
             UnSelect();
             torus = true;
-            Update = true;
         }
         void SelectPentatope(){
             UnSelect();
             pentatope = true;
-            Update = true;
         }
         void SelectIcositetra(){
             UnSelect();
             icositetra = true;
-            Update = true;
         }
         void SelectPipeline(){
             UnSelect();
             pipeline = true;
-            Update = true;
         }
         void SelectCylinder(){
             UnSelect();
             cylinder = true;
-            Update = true;
         }
         void SelectClifford(){
             UnSelect();
             clifford = true;
-            Update = true;
         }
         void SelectHexadeca(){
             UnSelect();
             hexadeca = true;
-            Update = true;
         }
         void SelectKleinBottle(){
             UnSelect();
             kleinBottle = true;
-            Update = true;
         }
         void SelectCylindrical(){
             UnSelect();
             spherinder = true;
-            Update = true;
         }
         void SelectGrid3D(){
             UnSelect();
             grid3d = true;
-            Update = true;
         }
         void SelectGrid4D(){
             UnSelect();
             grid4d = true;
-            Update = true;
         }
         void SelectHypersphere(){
             UnSelect();
             hypersphere = true;
-            Update = true;        
         }
         void SelectFont(){
             UnSelect();
             font = true;
-            Update = true;
         }
     }geometry;
     struct{
@@ -154,6 +136,8 @@ struct ImGuiInput{
     }rotateMode;
     bool fill = true;
     bool ortho = false;
+    UseData parameter;
+    bool UpdateGeometery = false;
 };
 struct PushConstant{
     glm::mat4 model;
@@ -255,6 +239,14 @@ void SetPlane(const std::string&splane){
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
 }
+void PrintMarix(const mglm::mat5&m){
+    for(int i = 0; i < 5; ++i){
+        for(int j = 0; j < 5; ++j){
+            std::cout << m[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+}
 void UpdateUniform(const vulkan::Device&device){
     mglm::mat5 projection;
     if(g_ImGuiInput.ortho){
@@ -265,14 +257,18 @@ void UpdateUniform(const vulkan::Device&device){
     }
     const mglm::mat5 view = mglm::lookAt(g_CameraPos, mglm::vec4(0), mglm::vec4(0, 1, 0, 0));
     const mglm::mat5 model = mglm::rotate(mglm::mat5(1.0f), glm::radians(g_Plane[0].angle), g_Plane[0].plane, glm::radians(g_Plane[1].angle), g_Plane[1].plane);
+
+    printf("-----view----\n");
+    PrintMarix(view);
+    printf("-----projection----\n");
+    PrintMarix(projection);
+    printf("----\n");
+    
     MVP_UBO ubo;
-    for (size_t i = 0; i < 5; i++){
-        for (size_t j = 0; j < 5; j++){
-            ubo.view[i][j] = view[i][j];
-            ubo.model[i][j] = model[i][j];
-            ubo.projection[i][j] = projection[i][j];
-        }
-    }
+    memcpy(ubo.view, view.data, sizeof(float) * 25);
+    memcpy(ubo.model, model.data, sizeof(float) * 25);
+    memcpy(ubo.projection, projection.data, sizeof(float) * 25);
+
     g_MvpUbo.UpdateData(device, &ubo);
 }
 void ShowGeometry(){
@@ -288,6 +284,7 @@ void ShowGeometry(){
             bool is_selected = fdGeometry == *currentGeometry;
             if (ImGui::Selectable(*currentGeometry, is_selected)){
                 fdGeometry = *currentGeometry;
+                g_ImGuiInput.UpdateGeometery = true;
                 if(fdGeometry == "超立方体"){
                     g_ImGuiInput.geometry.SelectTesseract();
                 }
@@ -338,6 +335,7 @@ void ShowGeometry(){
             bool is_selected = tdGeometry == *currentGeometry;
             if (ImGui::Selectable(*currentGeometry, is_selected)){
                 tdGeometry = *currentGeometry;
+                g_ImGuiInput.UpdateGeometery = true;
                 if(tdGeometry == "球"){
                     g_ImGuiInput.geometry.SelectSphere();
                 }
@@ -458,22 +456,22 @@ void UpdateImGui(vk::CommandBuffer command){
         ShowRotate();
         ShowGeometry();
         if(g_ImGuiInput.geometry.clifford){
-            if(ImGui::SliderFloat("时间", &g_ImGuiInput.geometry.parameter.cliffordTime, 0, 1)){
-                g_ImGuiInput.geometry.Update = true;
+            if(ImGui::SliderFloat("时间", &g_ImGuiInput.parameter.cliffordTime, 0, 1)){
+                g_ImGuiInput.UpdateGeometery = true;
             }
         }
-        if(g_ImGuiInput.geometry.cylinder || g_ImGuiInput.geometry.font){
-            if(ImGui::InputFloat("半径", &g_ImGuiInput.geometry.parameter.radius)){
-                g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
+        if(g_ImGuiInput.geometry.pipeline || g_ImGuiInput.geometry.font){
+            if(ImGui::InputFloat("半径", &g_ImGuiInput.parameter.radius)){
+                g_Geometry->Update(&g_ImGuiInput.parameter);
             }
-            if(ImGui::InputFloat("采样率", &g_ImGuiInput.geometry.parameter.samples)){
-                g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
+            if(ImGui::InputFloat("采样率", &g_ImGuiInput.parameter.samples)){
+                g_Geometry->Update(&g_ImGuiInput.parameter);
             }
             for (size_t i = 0; i < 4; i++){
                 char label[0xff];
                 sprintf(label, "点%d", i);
-                if(ImGui::InputFloat4(label, g_ImGuiInput.geometry.parameter.point[i].data())){
-                    g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
+                if(ImGui::InputFloat4(label, g_ImGuiInput.parameter.point[i].data())){
+                    g_Geometry->Update(&g_ImGuiInput.parameter);
                 }
             }
         }
@@ -794,8 +792,8 @@ void RecreateSwapchain(void *userData){
 }
 void display(GLFWwindow* window){
     g_VulkanDevice.waitIdle();
-    if(g_ImGuiInput.geometry.Update){
-        g_ImGuiInput.geometry.Update = false;
+    if(g_ImGuiInput.UpdateGeometery){
+        g_ImGuiInput.UpdateGeometery = false;
         g_Geometry->Cleanup();
         delete g_Geometry;
         if(g_ImGuiInput.geometry.tesseract){
@@ -849,7 +847,7 @@ void display(GLFWwindow* window){
         }
 #endif
         g_Geometry->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
-        g_Geometry->Update(&g_ImGuiInput.geometry.parameter);
+        g_Geometry->Update(&g_ImGuiInput.parameter);
         UpdateUniform(g_VulkanDevice);
     }
     if(g_VulkanDevice.IsEnableDynamicRendering()){

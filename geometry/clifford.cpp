@@ -21,6 +21,56 @@ std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t v
 
     return vertices;
 }
+// std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t vSegments, float t) {
+//     std::vector<Vertex> vertices;
+//     vertices.reserve(uSegments * vSegments);
+//     const float PI2 = glm::two_pi<float>();
+//     const float SQRT2_INV = 0.70710678f;
+//     const float target_theta = glm::quarter_pi<float>(); // pi/4
+//     const float hopf_amp1 = cosf(target_theta / 2.0f);
+//     const float hopf_amp2 = sinf(target_theta / 2.0f);
+//     for (uint32_t i = 0; i < uSegments; ++i) {
+//         float u = PI2 * float(i) / float(uSegments);
+//         for (uint32_t j = 0; j < vSegments; ++j) {
+//             float v = PI2 * float(j) / float(vSegments);
+//             // 1. Clifford 环面 (t=0) - 对应赤道 (Theta = pi/2)
+//             glm::vec4 clifford(
+//                 SQRT2_INV * cosf(u + v),
+//                 SQRT2_INV * sinf(u + v),
+//                 SQRT2_INV * cosf(v),
+//                 SQRT2_INV * sinf(v)
+//             );
+//             // 2. Hopf 环面 (t=1) - 对应某一纬度 (Theta = target_theta)
+//             glm::vec4 hopf(
+//                 hopf_amp1 * cosf(u + v),
+//                 hopf_amp1 * sinf(u + v),
+//                 hopf_amp2 * cosf(v),
+//                 hopf_amp2 * sinf(v)
+//             );
+//             // 3. Quaternion 转换 + Slerp
+//             glm::quat clifford_quat(clifford.w, clifford.x, clifford.y, clifford.z);
+//             glm::quat hopf_quat(hopf.w, hopf.x, hopf.y, hopf.z);
+//             // 【关键修改3】保证四元数走短弧插值 (防止网格在插值时扭结翻转)
+//             if (glm::dot(clifford_quat, hopf_quat) < 0.0f) {
+//                 hopf_quat = -hopf_quat;
+//             }
+//             clifford_quat = glm::normalize(clifford_quat);
+//             hopf_quat = glm::normalize(hopf_quat);
+//             glm::quat result_quat;
+//             if (t <= 0.0f) {
+//                 result_quat = clifford_quat;
+//             } else if (t >= 1.0f) {
+//                 result_quat = hopf_quat;
+//             } else {
+//                 result_quat = glm::slerp(clifford_quat, hopf_quat, t);
+//             }
+//             glm::vec4 pos(result_quat.x, result_quat.y, result_quat.z, result_quat.w);
+//             glm::vec3 color(cosf(u) * 0.5f + 0.5f, sinf(v) * 0.5f + 0.5f, 1.0f);
+//             vertices.emplace_back(pos, color);
+//         }
+//     }
+//     return vertices;
+// }
 std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t vSegments, float t) {
     std::vector<Vertex> vertices;
     vertices.reserve(uSegments * vSegments);

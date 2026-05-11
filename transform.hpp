@@ -29,7 +29,7 @@ namespace mglm{
         vec4 f = normalize(target - eye);
         vec4 s = normalize(cross(over, up, f));
         vec4 u = normalize(cross(f, s, over));
-        vec4 o = normalize(cross(s, u, f));
+        vec4 o = -normalize(cross(s, u, f));
         
         mat5 view = mglm::mat5(1.0f);
         view[0][0] = s.x;   view[1][0] = s.y;   view[2][0] = s.z;   view[3][0] = s.w;
@@ -107,7 +107,6 @@ namespace mglm{
         m[4][1] = -(top + bottom) / (top - bottom);
         m[4][2] = -(zFar + zNear) / (zFar - zNear);
         m[4][3] = -(wFar + wNear) / (wFar - wNear);
-        
         return m;
     }
     inline mglm::mat5 scale(const mglm::mat5& m, const mglm::vec4& factors) {
