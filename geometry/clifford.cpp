@@ -32,10 +32,10 @@ std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t v
         float u = glm::two_pi<float>() * float(i) / float(uSegments);
         
         // === S² 上的曲线插值 ===
-        // t=0: 赤道大圆 (Clifford 对应的 S² 曲线)
-        // t=1: 变形曲线 (Hopf torus)
+        // t=0: 赤道大圆(Clifford 对应的S²曲线)
+        // t=1: 变形曲线(Hopf torus)
         
-        // 基曲线（大圆方向）
+        // 基曲线(大圆方向)
         glm::vec3 p_base(0.0f, cosf(u), sinf(u));
         
         // 变形曲线(带 lobe)
@@ -58,7 +58,6 @@ std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t v
                  + (sinf(t * angle) / sinAngle) * p_hopf;
         }
 
-        // === Hopf 提升 ===
         // p_s2 = (p1, p2, p3)，构造水平提升 y(u)
         float yden = sqrtf(2.0f * (1.0f + p_s2.x));
         float y1 = (1.0f + p_s2.x) / yden;

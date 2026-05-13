@@ -137,6 +137,7 @@ struct ImGuiInput{
     bool fill = true;
     bool ortho = false;
     UseData parameter;
+    bool mutliView = false;
     bool UpdateGeometery = false;
 };
 struct PushConstant{
@@ -184,7 +185,7 @@ ImGuiInput g_ImGuiInput;
 #ifdef ENABE_DEPTH_TEST
 DepthTest g_DepthTest;
 #endif
-mglm::vec4 g_CameraPos = mglm::vec4(0, 0, 0, 3);
+std::array g_CameraPos = { mglm::vec4(0, 0, 0, 3), mglm::vec4(3, 0, 0, 0), mglm::vec4(0, 3, 0, 0), mglm::vec4(0, 0, 3, 0) };
 const char *GetPlaneString(const mglm::Plane&plane){
     std::string strPlane;
     if(mglm::abs(plane.u) == mglm::vec4(1, 0, 0, 0)){
@@ -239,14 +240,6 @@ void SetPlane(const std::string&splane){
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
 }
-void PrintMarix(const mglm::mat5&m){
-    for(int i = 0; i < 5; ++i){
-        for(int j = 0; j < 5; ++j){
-            std::cout << m[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-}
 void UpdateUniform(const vulkan::Device&device){
     mglm::mat5 projection;
     if(g_ImGuiInput.ortho){
@@ -255,21 +248,20 @@ void UpdateUniform(const vulkan::Device&device){
     else{
         projection = mglm::perspective(glm::radians(45.0f), glm::radians(45.0f), glm::radians(45.0f), .1f, 100.0f);
     }
-    const mglm::mat5 view = mglm::lookAt(g_CameraPos, mglm::vec4(0), mglm::vec4(0, 1, 0, 0));
     const mglm::mat5 model = mglm::rotate(mglm::mat5(1.0f), glm::radians(g_Plane[0].angle), g_Plane[0].plane, glm::radians(g_Plane[1].angle), g_Plane[1].plane);
+    for (size_t i = 0; i < 4; i++){
+        mglm::vec4 up = mglm::vec4(0, 1, 0, 0);
+        if(mglm::dot(g_CameraPos[i], up) > 1e-6f){
+            up = mglm::getOrthogonal(mglm::normalize(g_CameraPos[i]));
+        }
+        const mglm::mat5 view = mglm::lookAt(g_CameraPos[i], mglm::vec4(0), up);
+        MVP_UBO ubo;
+        memcpy(ubo.view, view.data, sizeof(float) * 25);
+        memcpy(ubo.model, model.data, sizeof(float) * 25);
+        memcpy(ubo.projection, projection.data, sizeof(float) * 25);
 
-    printf("-----view----\n");
-    PrintMarix(view);
-    printf("-----projection----\n");
-    PrintMarix(projection);
-    printf("----\n");
-    
-    MVP_UBO ubo;
-    memcpy(ubo.view, view.data, sizeof(float) * 25);
-    memcpy(ubo.model, model.data, sizeof(float) * 25);
-    memcpy(ubo.projection, projection.data, sizeof(float) * 25);
-
-    g_MvpUbo.UpdateData(device, &ubo);
+        g_MvpUbo.UpdateData(device, &ubo, i * g_MvpUbo.GetSize());        
+    }
 }
 void ShowGeometry(){
     ImGui::SeparatorText("几何");
@@ -427,6 +419,10 @@ void UpdateImGui(vk::CommandBuffer command){
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     if(ImGui::BeginMainMenuBar()){
+        if(ImGui::BeginMenu("视图")){
+            ImGui::MenuItem("多视图", nullptr, &g_ImGuiInput.mutliView);
+            ImGui::EndMenu();
+        }
         if(ImGui::BeginMenu("旋转")){
             if(ImGui::MenuItem("自由")){
                 g_ImGuiInput.rotateMode.preset = false;
@@ -448,10 +444,19 @@ void UpdateImGui(vk::CommandBuffer command){
         if(ImGui::Checkbox("正交投影", &g_ImGuiInput.ortho)){
             UpdateUniform(g_VulkanDevice);
         }
-        static float cameraPos[] = { g_CameraPos.x, g_CameraPos.y, g_CameraPos.z, g_CameraPos.w };
-        if(ImGui::InputFloat4("四维摄像机", cameraPos)){
-            g_CameraPos = mglm::vec4(cameraPos[0], cameraPos[1], cameraPos[2], cameraPos[3]);
-            UpdateUniform(g_VulkanDevice);
+        static float cameraPos[][4] = {
+            {g_CameraPos[0].x, g_CameraPos[0].y, g_CameraPos[0].z, g_CameraPos[0].w },
+            {g_CameraPos[1].x, g_CameraPos[1].y, g_CameraPos[1].z, g_CameraPos[1].w },
+            {g_CameraPos[2].x, g_CameraPos[2].y, g_CameraPos[2].z, g_CameraPos[2].w },
+            {g_CameraPos[3].x, g_CameraPos[3].y, g_CameraPos[3].z, g_CameraPos[3].w }
+        };
+        for (size_t i = 0; i < 4; i++){
+            char lable[0xff] = {0};
+            sprintf(lable, "四维摄像机%d", i);
+            if(ImGui::InputFloat4(lable, cameraPos[i])){
+                g_CameraPos[i] = mglm::vec4(cameraPos[i][0], cameraPos[i][1], cameraPos[i][2], cameraPos[i][3]);
+                UpdateUniform(g_VulkanDevice);
+            }
         }
         ShowRotate();
         ShowGeometry();
@@ -485,24 +490,51 @@ void UpdateImGui(vk::CommandBuffer command){
 void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t count){
     PushConstant pc;
     pc.model = glm::mat4(1.0f);
-    pc.projection = glm::perspective(glm::radians(45.0f), (float)g_WindowWidth / g_WindowHeight, 0.1f, 100.0f);
-    pc.projection[1][1] *= -1;
     if(g_ImGuiInput.fill){
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline[0]);
     }
     else{
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline[1]);
     }
-    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 0, g_Set, {});
+    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 0, g_Set[0], {});
 #ifdef ENABE_DEPTH_TEST
     command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 2, g_DepthTest.set, {});
 #endif
-    vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
-    if(g_ImGuiInput.fill){
-        g_Geometry->Draw(command, g_Pipeline.layout);
+    uint32_t dynamicOffsets = 0;
+    if(g_ImGuiInput.mutliView){
+        for(uint32_t i = 0; i < 4; ++i){
+            dynamicOffsets = i * g_MvpUbo.GetSize();
+            const uint32_t width = g_WindowWidth / 2;
+            const uint32_t height = g_WindowHeight / 2;
+            const uint32_t offsetX = (i % 2) * g_WindowWidth / 2;
+            const uint32_t offsetY = (i / 2) * g_WindowHeight / 2;
+            pc.projection = glm::perspective(glm::radians(45.0f), (float)width / height, 0.1f, 100.0f);
+            pc.projection[1][1] *= -1;
+            command.setScissor(0, vulkan::pipeline::initializers::scissor(width, height, offsetX, offsetY));
+            command.setViewport(0, vulkan::pipeline::initializers::viewport(width, height, offsetX, offsetY));
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
+            vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
+            if(g_ImGuiInput.fill){
+                g_Geometry->Draw(command, g_Pipeline.layout);
+            }
+            else{
+                g_Geometry->DrawWireframe(command, g_Pipeline.layout);
+            }
+        }
     }
     else{
-        g_Geometry->DrawWireframe(command, g_Pipeline.layout);
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
+        pc.projection = glm::perspective(glm::radians(45.0f), (float)g_WindowWidth / g_WindowHeight, 0.1f, 100.0f);
+        pc.projection[1][1] *= -1;
+        command.setScissor(0, vulkan::pipeline::initializers::scissor(g_WindowWidth, g_WindowHeight));
+        command.setViewport(0, vulkan::pipeline::initializers::viewport(g_WindowWidth, g_WindowHeight));
+        vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
+        if(g_ImGuiInput.fill){
+            g_Geometry->Draw(command, g_Pipeline.layout);
+        }
+        else{
+            g_Geometry->DrawWireframe(command, g_Pipeline.layout);
+        }
     }
 }
 #ifdef ENABE_DEPTH_TEST
@@ -611,12 +643,12 @@ void CreateGraphicsPipeline(vk::Device device, VkPipelineLayout layout){
     vk::PipelineDepthStencilStateCreateInfo depthStencilState = vulkan::pipeline::initializers::pipelineDepthStencilStateCreateInfo(vk::True, vk::True, vk::CompareOp::eLessOrEqual);
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = vulkan::pipeline::initializers::pipelineInputAssemblyStateCreateInfo(vk::PrimitiveTopology::eTriangleList, vk::False);
     vk::PipelineRasterizationStateCreateInfo rasterizationState = vulkan::pipeline::initializers::pipelineRasterizationStateCreateInfo(vk::PolygonMode::eFill, vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise);
-    // std::array<vk::DynamicState, 2> dynamicStateEnables = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
-    // vk::PipelineDynamicStateCreateInfo dynamicState = vulkan::pipeline::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), static_cast<uint32_t>(dynamicStateEnables.size()));
-    vk::Rect2D scissors = vulkan::pipeline::initializers::scissor(g_WindowWidth, g_WindowHeight);
-    vk::Viewport viewport = vulkan::pipeline::initializers::viewport(g_WindowWidth, g_WindowHeight);
-    viewportState.pScissors = &scissors;
-    viewportState.pViewports = &viewport;
+    std::array<vk::DynamicState, 2> dynamicStateEnables = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
+    vk::PipelineDynamicStateCreateInfo dynamicState = vulkan::pipeline::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), static_cast<uint32_t>(dynamicStateEnables.size()));
+    // vk::Rect2D scissors = vulkan::pipeline::initializers::scissor(g_WindowWidth, g_WindowHeight);
+    // vk::Viewport viewport = vulkan::pipeline::initializers::viewport(g_WindowWidth, g_WindowHeight);
+    // viewportState.pScissors = &scissors;
+    // viewportState.pViewports = &viewport;
 
     inputState.sType =  vk::StructureType::ePipelineVertexInputStateCreateInfo;
     inputState.vertexBindingDescriptionCount = 1;
@@ -637,8 +669,8 @@ void CreateGraphicsPipeline(vk::Device device, VkPipelineLayout layout){
     info.stageCount = shaderStages.size();
 
     info.pVertexInputState = &inputState;
+    info.pDynamicState = &dynamicState;
     info.pViewportState = &viewportState;
-    // info.pDynamicState = &dynamicState;
     info.pColorBlendState = &colorBlendState;
     info.pMultisampleState = &multisampleState;
     info.pDepthStencilState = &depthStencilState;
@@ -657,10 +689,12 @@ void CreateGraphicsPipeline(vk::Device device, VkPipelineLayout layout){
     device.destroyShaderModule(shaderStages[1].module);
 }
 void CreateMVPUBO(const vulkan::Device&device){
-    g_MvpUbo.Create(device, sizeof(MVP_UBO), vk::BufferUsageFlagBits::eStorageBuffer, vma::MemoryUsage::eCpuToGpu, true);
+    auto physicalDeviceProperties = device.GetPhysicalDeviceProperties();
+    const int32_t minUniformBufferOffset = ALIGN(sizeof(MVP_UBO), physicalDeviceProperties.limits.minUniformBufferOffsetAlignment);
+    g_MvpUbo.Create(device, minUniformBufferOffset, 4, vk::BufferUsageFlagBits::eStorageBuffer, vma::MemoryUsage::eCpuToGpu, true);
     UpdateUniform(device);
     std::vector bindings = {
-        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex)
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex)
     };
     vulkan::framework::UpdateDescriptorSets(device, bindings, {g_MvpUbo}, {}, g_Set[1]);
 }
@@ -691,7 +725,7 @@ void SetupDescriptorSetLayout(vk::Device device){
     };
     g_CameraSetLayout[0] = device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings));
     std::array mvp_bindings = {
-        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex)
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex)
     };
     g_CameraSetLayout[1] = device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, mvp_bindings));
 #ifdef ENABE_DEPTH_TEST
@@ -918,12 +952,20 @@ void CleanupVulkan(){
 
     g_VulkanDevice.Cleanup();
 }
+glm::uvec2 GetScreenSize(){
+    GLFWmonitor* primary = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primary);
+    return glm::uvec2(mode->width, mode->height);
+}
 #ifdef _WIN32
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
     if (GLFW_FALSE == glfwInit()) {
         printf("initialize glfw error");
         return 1;
     }
+    auto screenSize = GetScreenSize();
+    if(g_WindowWidth > screenSize.x)g_WindowWidth = screenSize.x * .8;
+    if(g_WindowHeight > screenSize.y)g_WindowHeight = screenSize.y * .8;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(g_WindowWidth, g_WindowHeight, "demo", NULL, NULL);
     // Setup Vulkan
@@ -965,8 +1007,10 @@ int main(){
         printf("initialize glfw error");
         return 1;
     }
+    auto screenSize = GetScreenSize();
+    if(g_WindowWidth > screenSize.x)g_WindowWidth = screenSize.x * .8;
+    if(g_WindowHeight > screenSize.y)g_WindowHeight = screenSize.y * .8;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    
     GLFWwindow* window = glfwCreateWindow(g_WindowWidth, g_WindowHeight, "demo", NULL, NULL);
     // Setup Vulkan
     if (!glfwVulkanSupported()){

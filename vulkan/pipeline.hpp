@@ -8,20 +8,20 @@ namespace vulkan{
 		namespace initializers{
 			inline auto scissor(uint32_t width, uint32_t height, int32_t offsetX = 0, int32_t offsetY = 0){
 				vk::Rect2D scissor {};
-				scissor.extent.width = width;
-				scissor.extent.height = height;
 				scissor.offset.x = offsetX;
 				scissor.offset.y = offsetY;
+				scissor.extent.width = width;
+				scissor.extent.height = height;
 				return scissor;
 			}
-			inline vk::Viewport viewport(uint32_t width, uint32_t height, float minDepth = 0.0f, float maxDepth = 1.0f){
+			inline vk::Viewport viewport(uint32_t width, uint32_t height, int32_t offsetX = 0, int32_t offsetY = 0, float minDepth = 0.0f, float maxDepth = 1.0f){
 				vk::Viewport viewport {};
 				viewport.width = static_cast<float>(width);
 				viewport.height = static_cast<float>(height);
 				viewport.minDepth = minDepth;
 				viewport.maxDepth = maxDepth;
-				viewport.x = 0;
-				viewport.y = 0;
+				viewport.x = offsetX;
+				viewport.y = offsetY;
 				return viewport;
 			}
 			inline vk::ShaderModuleCreateInfo shaderModuleCreateInfo(uint32_t size){
