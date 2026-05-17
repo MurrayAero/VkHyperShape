@@ -4,67 +4,40 @@ VecType bezier(const VecType& p0, const VecType& p1, const VecType& p2, const Ve
     float u = 1.0f - t;
     return p0 * (u*u*u) + p1 * (3*u*u*t) + p2 * (3*u*t*t) + p3 * (t*t*t);
 }
-
-// 四维贝塞尔曲线求导
 template<typename VecType>
 VecType bezierTangent(const VecType& p0, const VecType& p1, const VecType& p2, const VecType& p3, float t) {
     float u = 1.0f - t;
     return (p1 - p0) * (3*u*u) + (p2 - p1) * (6*u*t) + (p3 - p2) * (3*t*t);
 }
 void findInitialFrame(const mglm::vec4& T, mglm::vec4& N1, mglm::vec4& N2, mglm::vec4& N3) {
-    mglm::vec4 axes[4] = {
-        mglm::vec4(1,0,0,0), mglm::vec4(0,1,0,0),
-        mglm::vec4(0,0,1,0), mglm::vec4(0,0,0,1)
-    };
+    mglm::Plane p;
+    p.u = mglm::normalize(T);
+    p.v = mglm::getOrthogonal(p.u);
+    p = p.orthonormalize();
 
-    // 排除与 T 最平行的轴，用剩下的 3 个轴做 Gram-Schmidt 正交化
-    int skip = 0;
-    float maxDot = std::abs(mglm::dot(T, axes[0]));
-    for (int i = 1; i < 4; ++i) {
-        float d = std::abs(mglm::dot(T, axes[i]));
-        if (d > maxDot) { maxDot = d; skip = i; }
-    }
-
-    mglm::vec4 a, b, c;
-    int idx = 0;
-    for (int i = 0; i < 4; ++i) {
-        if (i == skip) continue;
-        if (idx == 0) a = axes[i];
-        else if (idx == 1) b = axes[i];
-        else c = axes[i];
-        idx++;
-    }
-
-    N1 = a - T * mglm::dot(T, a);
-    N1 = mglm::normalize(N1);
-
-    N2 = b - T * mglm::dot(T, b) - N1 * mglm::dot(N1, b);
-    N2 = mglm::normalize(N2);
-
-    N3 = c - T * mglm::dot(T, c) - N1 * mglm::dot(N1, c) - N2 * mglm::dot(N2, c);
-    N3 = mglm::normalize(N3);
+    mglm::Plane orthP = mglm::getOrthogonalPlane(p);
+    
+    N1 = p.v;
+    N2 = orthP.u;
+    N3 = orthP.v;
 }
+
 bool transportFrame(const mglm::vec4& N1_prev, const mglm::vec4& N2_prev, const mglm::vec4& N3_prev, const mglm::vec4& T_curr, mglm::vec4& N1_curr, mglm::vec4& N2_curr, mglm::vec4& N3_curr) {
-    mglm::vec4 u1 = N1_prev - T_curr * mglm::dot(T_curr, N1_prev);
-    mglm::vec4 u2 = N2_prev - T_curr * mglm::dot(T_curr, N2_prev);
-    mglm::vec4 u3 = N3_prev - T_curr * mglm::dot(T_curr, N3_prev);
+    mglm::Plane p(N1_prev - T_curr * mglm::dot(T_curr, N1_prev), N2_prev - T_curr * mglm::dot(T_curr, N2_prev));
+    p = p.orthonormalize();
+    if (mglm::length(p.v) < 1e-4f) return false;
 
-    float len1 = mglm::length(u1);
-    if (len1 < 1e-4f) return false; 
-    N1_curr = u1 / len1;
+    N1_curr = p.u;
+    N2_curr = p.v;
 
-    u2 = u2 - N1_curr * mglm::dot(N1_curr, u2);
-    float len2 = mglm::length(u2);
-    if (len2 < 1e-4f) return false;
-    N2_curr = u2 / len2;
-
-    u3 = u3 - N1_curr * mglm::dot(N1_curr, u3) - N2_curr * mglm::dot(N2_curr, u3);
-    float len3 = mglm::length(u3);
-    if (len3 < 1e-4f) return false;
-    N3_curr = u3 / len3;
-
+    mglm::vec4 u3 = mglm::cross(T_curr, N1_curr, N2_curr);
+    
+    // 理论上 |u3| 应该是1,但浮点累积误差可能导致微小偏移,所以仍做安全检查和归一化
+    if (mglm::length(u3) < 1e-4f) return false;
+    N3_curr = mglm::normalize(u3);
     return true;
 }
+
 void generateCurvedCylinder(std::vector<Vertex>& vertices, std::vector<uint16_t>& indices,
     const mglm::vec4& p0, const mglm::vec4& p1, const mglm::vec4& p2, const mglm::vec4& p3,
     float radius, int samples, int segments
@@ -200,12 +173,13 @@ void Pipeline::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layou
 void Pipeline::Update(const void *useData){
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
+    const uint32_t segments = 16;
     UseData *parameter = (UseData *)useData;
     generateCurvedCylinder(vertices, indices,
         mglm::vec4(parameter->point[0][0], parameter->point[0][1], parameter->point[0][2], parameter->point[0][3]),
         mglm::vec4(parameter->point[1][0], parameter->point[1][1], parameter->point[1][2], parameter->point[1][3]),
         mglm::vec4(parameter->point[2][0], parameter->point[2][1], parameter->point[2][2], parameter->point[2][3]),
-        mglm::vec4(parameter->point[3][0], parameter->point[3][1], parameter->point[3][2], parameter->point[3][3]), parameter->radius, parameter->samples, parameter->segments);
+        mglm::vec4(parameter->point[3][0], parameter->point[3][1], parameter->point[3][2], parameter->point[3][3]), parameter->radius, parameter->samples, segments);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);
@@ -247,12 +221,13 @@ void Font::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
 void Font::Update(const void *useData){
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
+    const uint32_t segments = 16;
     UseData parameter = *(UseData *)useData;
     generateCurvedCylinder(vertices, indices,
         glm::vec3(parameter.point[0][0], parameter.point[0][1], parameter.point[0][2]),
         glm::vec3(parameter.point[1][0], parameter.point[1][1], parameter.point[1][2]),
         glm::vec3(parameter.point[2][0], parameter.point[2][1], parameter.point[2][2]),
-        glm::vec3(parameter.point[3][0], parameter.point[3][1], parameter.point[3][2]), parameter.radius, parameter.samples, parameter.segments);
+        glm::vec3(parameter.point[3][0], parameter.point[3][1], parameter.point[3][2]), parameter.radius, parameter.samples, segments);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

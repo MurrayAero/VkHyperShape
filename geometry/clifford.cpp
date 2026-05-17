@@ -40,11 +40,7 @@ std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t v
         
         // 变形曲线(带 lobe)
         float envelope = cosf(lobeDepth * cosf(lobeCount * u));
-        glm::vec3 p_hopf(sinf(lobeDepth * cosf(lobeCount * u)), 
-                         cosf(u) * envelope, 
-                         sinf(u) * envelope);
-        
-        // 在 S² 上 slerp（用 glm::normalize + dot 检查）
+        glm::vec3 p_hopf(sinf(lobeDepth * cosf(lobeCount * u)), cosf(u) * envelope, sinf(u) * envelope);
         float dp = glm::dot(p_base, p_hopf);
         if (dp < 0.0f) p_hopf = -p_hopf;
         
@@ -54,8 +50,7 @@ std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t v
             p_s2 = p_base;
         } else {
             float sinAngle = sinf(angle);
-            p_s2 = (sinf((1.0f - t) * angle) / sinAngle) * p_base 
-                 + (sinf(t * angle) / sinAngle) * p_hopf;
+            p_s2 = (sinf((1.0f - t) * angle) / sinAngle) * p_base + (sinf(t * angle) / sinAngle) * p_hopf;
         }
 
         // p_s2 = (p1, p2, p3)，构造水平提升 y(u)
@@ -70,24 +65,15 @@ std::vector<Vertex> generateCliffordTorusVertices(uint32_t uSegments, uint32_t v
             float sinv = sinf(v);
 
             // e^(i*v) * y(u) 作为四元数乘法
-            glm::vec4 pos(
-                cosv * y1,                    // w
-                sinv * y1,                    // x  
-                cosv * y2 - sinv * y3,        // y
-                cosv * y3 + sinv * y2         // z
-            );
-            glm::vec3 color(
-                cosf(u) * 0.5f + 0.5f,
-                sinf(v) * 0.5f + 0.5f,
-                glm::mix(1.0f, 0.8f, t)
-            );
+            glm::vec4 pos(cosv * y1, sinv * y1, cosv * y2 - sinv * y3, cosv * y3 + sinv * y2);
+            glm::vec3 color(cosf(u) * 0.5f + 0.5f, sinf(v) * 0.5f + 0.5f, glm::mix(1.0f, 0.8f, t));
 
             vertices.emplace_back(pos, color);
         }
     }
     return vertices;
 }
-std::vector<uint16_t> generateCliffordTorusWireframeIndices(uint32_t uSegments, uint32_t vSegments){
+std::vector<uint16_t> generateCliffordTorusEdge(uint32_t uSegments, uint32_t vSegments){
     std::vector<uint16_t> lineIndices;
     lineIndices.reserve(uSegments * vSegments * 4);
 
@@ -162,8 +148,8 @@ void Clifford::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layou
 void Clifford::Update(const void *useData){
     const UseData *parameter = (const UseData*)useData;
     const glm::uvec2 segments = glm::uvec2(64);
-    std::vector<Vertex> vertices = generateCliffordTorusVertices(segments.x, segments.y, parameter->cliffordTime);
     std::vector<uint16_t> indices = generateCliffordTorusIndices(segments.x, segments.y);
+    std::vector<Vertex> vertices = generateCliffordTorusVertices(segments.x, segments.y, parameter->cliffordTime);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);
@@ -172,7 +158,7 @@ void Clifford::Update(const void *useData){
         mGeometry.UpdateIndexData(*gpu.device, indices.data(), gpu.graphics, *gpu.pool);
         mGeometry.UpdateVertexData(*gpu.device, vertices.data(), gpu.graphics, *gpu.pool);
     }
-    indices = generateCliffordTorusWireframeIndices(segments.x, segments.y);
+    indices = generateCliffordTorusEdge(segments.x, segments.y);
     if(!mWireframe.IsVaildIndex() || !mWireframe.IsVaildVertex()){
         mWireframe.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mWireframe.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

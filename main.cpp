@@ -25,6 +25,7 @@
 #include "geometry/spherinder.h"
 #include "geometry/kleinBottle.h"
 #include "geometry/hypersphere.h"
+#include "geometry/projectivePlane.h"
 struct ImGuiPlaneInput{
     float angle;
     std::string splane;
@@ -48,6 +49,8 @@ struct ImGuiInput{
         bool grid3d = false;
         bool sphere = false;
         bool clifford = false;
+        bool update = false;
+        bool remake = false;
         bool pipeline = false;
         bool cylinder = false;
         bool tesseract = true;
@@ -57,6 +60,7 @@ struct ImGuiInput{
         bool spherinder = false;
         bool kleinBottle = false;
         bool hypersphere = false;
+        bool realProjectivePlane = false;
 #ifdef DEBUG
     bool testGeometry = false;
 #endif
@@ -66,68 +70,105 @@ struct ImGuiInput{
 #ifdef DEBUG
         void SeletctTestGeometry(){
             UnSelect();
+            update = true;
             testGeometry = true;
         }
 #endif
         void SelectTesseract(){
             UnSelect();
+            update = true;
+            remake = true;
             tesseract = true;
         }
         void SelectSphere(){
             UnSelect();
             sphere = true;
+            update = true;
+            remake = true;
         }
         void SelectTorus(){
             UnSelect();
             torus = true;
+            update = true;
+            remake = true;
         }
         void SelectPentatope(){
             UnSelect();
+            update = true;
+            remake = true;
             pentatope = true;
         }
         void SelectIcositetra(){
             UnSelect();
+            update = true;
+            remake = true;
             icositetra = true;
         }
         void SelectPipeline(){
             UnSelect();
+            update = true;
+            remake = true;
             pipeline = true;
         }
         void SelectCylinder(){
             UnSelect();
+            update = true;
+            remake = true;
             cylinder = true;
         }
         void SelectClifford(){
             UnSelect();
+            update = true;
             clifford = true;
+            remake = true;
         }
         void SelectHexadeca(){
             UnSelect();
+            update = true;
+            remake = true;
             hexadeca = true;
         }
         void SelectKleinBottle(){
             UnSelect();
+            update = true;
+            remake = true;
             kleinBottle = true;
         }
         void SelectCylindrical(){
             UnSelect();
+            update = true;
+            remake = true;
             spherinder = true;
         }
         void SelectGrid3D(){
             UnSelect();
             grid3d = true;
+            update = true;
+            remake = true;
         }
         void SelectGrid4D(){
             UnSelect();
             grid4d = true;
+            update = true;
+            remake = true;
         }
         void SelectHypersphere(){
             UnSelect();
+            update = true;
+            remake = true;
             hypersphere = true;
         }
         void SelectFont(){
             UnSelect();
             font = true;
+            update = true;
+            remake = true;
+        }
+        void SelectRealProjectionPlane(){
+            UnSelect();
+            update = true;
+            remake = true;
+            realProjectivePlane = true;
         }
     }geometry;
     struct{
@@ -138,7 +179,6 @@ struct ImGuiInput{
     bool ortho = false;
     UseData parameter;
     bool mutliView = false;
-    bool UpdateGeometery = false;
 };
 struct PushConstant{
     glm::mat4 model;
@@ -264,8 +304,7 @@ void UpdateUniform(const vulkan::Device&device){
     }
 }
 void ShowGeometry(){
-    ImGui::SeparatorText("几何");
-    const std::array fdCurrentItems = { "超立方体", "球柱体", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "Clifford环面", "克莱因瓶", "四维网格",
+    const std::array fdCurrentItems = { "超立方体", "球柱体", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "Clifford环面", "克莱因瓶", "实射影平面", "四维网格",
 #ifdef DEBUG
         "图元测试"
 #endif
@@ -276,7 +315,6 @@ void ShowGeometry(){
             bool is_selected = fdGeometry == *currentGeometry;
             if (ImGui::Selectable(*currentGeometry, is_selected)){
                 fdGeometry = *currentGeometry;
-                g_ImGuiInput.UpdateGeometery = true;
                 if(fdGeometry == "超立方体"){
                     g_ImGuiInput.geometry.SelectTesseract();
                 }
@@ -310,6 +348,9 @@ void ShowGeometry(){
                 else if(fdGeometry == "四维网格"){
                     g_ImGuiInput.geometry.SelectGrid4D();
                 }
+                else if(fdGeometry == "实射影平面"){
+                    g_ImGuiInput.geometry.SelectRealProjectionPlane();
+                }
 #ifdef DEBUG
                 else if(fdGeometry == "图元测试"){
                     g_ImGuiInput.geometry.SeletctTestGeometry();
@@ -327,7 +368,6 @@ void ShowGeometry(){
             bool is_selected = tdGeometry == *currentGeometry;
             if (ImGui::Selectable(*currentGeometry, is_selected)){
                 tdGeometry = *currentGeometry;
-                g_ImGuiInput.UpdateGeometery = true;
                 if(tdGeometry == "球"){
                     g_ImGuiInput.geometry.SelectSphere();
                 }
@@ -362,7 +402,6 @@ void ShowPlaneCombo(const char *lable){
     SetPlane(plane);
 }
 void ShowRotate(){
-    ImGui::SeparatorText("四维旋转");
     if(g_ImGuiInput.rotateMode.preset){
         ShowPlaneCombo("平面一");
         ImGui::SameLine();
@@ -450,7 +489,7 @@ void UpdateImGui(vk::CommandBuffer command){
             {g_CameraPos[2].x, g_CameraPos[2].y, g_CameraPos[2].z, g_CameraPos[2].w },
             {g_CameraPos[3].x, g_CameraPos[3].y, g_CameraPos[3].z, g_CameraPos[3].w }
         };
-        for (size_t i = 0; i < 4; i++){
+        for (size_t i = 0; i < (g_ImGuiInput.mutliView?4:1); i++){
             char lable[0xff] = {0};
             sprintf(lable, "四维摄像机%d", i);
             if(ImGui::InputFloat4(lable, cameraPos[i])){
@@ -458,11 +497,19 @@ void UpdateImGui(vk::CommandBuffer command){
                 UpdateUniform(g_VulkanDevice);
             }
         }
+        ImGui::SeparatorText("四维旋转");
         ShowRotate();
+        ImGui::SeparatorText("几何");
         ShowGeometry();
+        ImGui::SeparatorText("几何参数");
+        if(g_ImGuiInput.geometry.kleinBottle){
+            if(ImGui::SliderInt("扭转次数", &g_ImGuiInput.parameter.twistLoops, 0, 5)){
+                g_ImGuiInput.geometry.update = true;
+            }
+        }
         if(g_ImGuiInput.geometry.clifford){
             if(ImGui::SliderFloat("时间", &g_ImGuiInput.parameter.cliffordTime, 0, 1)){
-                g_ImGuiInput.UpdateGeometery = true;
+                g_ImGuiInput.geometry.update = true;
             }
         }
         if(g_ImGuiInput.geometry.pipeline || g_ImGuiInput.geometry.font){
@@ -512,7 +559,7 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
             pc.projection[1][1] *= -1;
             command.setScissor(0, vulkan::pipeline::initializers::scissor(width, height, offsetX, offsetY));
             command.setViewport(0, vulkan::pipeline::initializers::viewport(width, height, offsetX, offsetY));
-        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
+            command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
             vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
             if(g_ImGuiInput.fill){
                 g_Geometry->Draw(command, g_Pipeline.layout);
@@ -774,7 +821,6 @@ void Setup(GLFWwindow *window){
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO&io = ImGui::GetIO();
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;//启用手柄
     io.ConfigNavCursorVisibleAlways = true;
     ImGui::StyleColorsDark();
 
@@ -826,8 +872,8 @@ void RecreateSwapchain(void *userData){
 }
 void display(GLFWwindow* window){
     g_VulkanDevice.waitIdle();
-    if(g_ImGuiInput.UpdateGeometery){
-        g_ImGuiInput.UpdateGeometery = false;
+    if(g_ImGuiInput.geometry.remake){
+        g_ImGuiInput.geometry.remake = false;
         g_Geometry->Cleanup();
         delete g_Geometry;
         if(g_ImGuiInput.geometry.tesseract){
@@ -875,12 +921,18 @@ void display(GLFWwindow* window){
         else if(g_ImGuiInput.geometry.hypersphere){
             g_Geometry = new Hypersphere;
         }
+        else if(g_ImGuiInput.geometry.realProjectivePlane){
+            g_Geometry = new ProjectivePlane;
+        }
 #ifdef DEBUG
         else if(g_ImGuiInput.geometry.testGeometry){
             g_Geometry = new GeometryTest;
         }
 #endif
         g_Geometry->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
+    }
+    if(g_ImGuiInput.geometry.update){
+        g_ImGuiInput.geometry.update = false;
         g_Geometry->Update(&g_ImGuiInput.parameter);
         UpdateUniform(g_VulkanDevice);
     }

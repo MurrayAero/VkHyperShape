@@ -17,7 +17,7 @@ struct UseData{
     float radius = .015;
     float samples = 20;
     float cliffordTime = 0;
-    uint32_t segments = 16;
+    int32_t twistLoops = 1;
     //这样写能直接传给imgui
     std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
 };

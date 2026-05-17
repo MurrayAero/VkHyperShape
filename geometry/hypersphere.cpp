@@ -8,26 +8,21 @@ std::vector<Vertex>generateHypersphere(uint32_t stacksPhi, uint32_t stacksTheta,
         z = R * sin(φ) * cos(θ)
         w = R * cos(φ)
     */
-    auto colorFromPos = [](const glm::vec4& p) -> glm::vec3 {
-        return glm::normalize(glm::vec3(p.x, p.y, p.z)) * 0.5f + 0.5f;
-    };
     for (uint32_t i = 0; i <= stacksPhi; ++i) {
-        float phi = glm::pi<float>() * i / stacksPhi;
+        const float phi = glm::pi<float>() * i / stacksPhi;
 
         for (uint32_t j = 0; j <= stacksTheta; ++j) {
-            float theta = glm::pi<float>() * j / stacksTheta;
+            const float theta = glm::pi<float>() * j / stacksTheta;
 
             for (uint32_t k = 0; k < slicesPsi; ++k) {
-                float psi = glm::two_pi<float>() * k / slicesPsi;
+                const float psi = glm::two_pi<float>() * k / slicesPsi;
 
-                float sinPhi = sin(phi);
-                float x = sinPhi * sin(theta) * cos(psi);
-                float y = sinPhi * sin(theta) * sin(psi);
-                float z = sinPhi * cos(theta);
-                float w = cos(phi);
-
-                glm::vec4 pos(x, y, z, w);
-                glm::vec3 color = colorFromPos(pos);
+                const float sinPhi = sin(phi);
+                glm::vec4 pos(sinPhi * sin(theta) * cos(psi),
+                sinPhi * sin(theta) * sin(psi),
+                sinPhi * cos(theta),
+                cos(phi));
+                glm::vec3 color = pos * 0.5f + 0.5f;
 
                 vertices.emplace_back(pos, color);
             }
@@ -71,7 +66,7 @@ std::vector<uint16_t>generateHypersphereIndices(uint32_t stacksPhi, uint32_t sta
     }
     return indices;
 }
-std::vector<uint16_t>generateHypersphereWireframe(uint32_t stacksPhi, uint32_t stacksTheta, uint32_t slicesPsi){
+std::vector<uint16_t>generateHypersphereEdge(uint32_t stacksPhi, uint32_t stacksTheta, uint32_t slicesPsi){
     std::vector<uint16_t> indices;
     auto idx = [&](uint16_t i, uint16_t j, uint16_t k) {
         return i * (stacksTheta + 1) * slicesPsi + j * slicesPsi + k;
@@ -135,7 +130,7 @@ void Hypersphere::Update(const void *useData){
         mHypersphere.UpdateIndexData(*gpu.device, indices.data(), gpu.graphics, *gpu.pool);
         mHypersphere.UpdateVertexData(*gpu.device, vertices.data(), gpu.graphics, *gpu.pool);
     }
-    indices = generateHypersphereWireframe(stacksPhi, stacksTheta, slicesPsi);
+    indices = generateHypersphereEdge(stacksPhi, stacksTheta, slicesPsi);
     if(!mWireframe.IsVaildIndex() || !mWireframe.IsVaildVertex()){
         mWireframe.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mWireframe.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

@@ -178,7 +178,7 @@ void Grid4D::Update(const void *useData){
         auto point = interpolate(x, y, z, w);
         int idx = vertices.size();
         const glm::vec4 pos = glm::vec4(point.x, point.y, point.z, point.w);
-        vertices.push_back(Vertex(pos, pos));
+        vertices.push_back(Vertex(pos, pos * .5f + .5f));
         vertex_map[key] = idx;
         return idx;
     };

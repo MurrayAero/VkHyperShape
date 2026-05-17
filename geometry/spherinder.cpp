@@ -17,7 +17,7 @@ std::vector<Vertex> GenerateSpherinderVertices(uint32_t stacksCount, uint32_t sl
                 float y = sinPhi * std::sin(theta);
                 float z = cosPhi;
                 glm::vec4 pos(x, y, z, w);
-                glm::vec3 color(0.5f + 0.5f * x, 0.5f + 0.5f * y,0.5f + 0.5f * z);
+                glm::vec3 color = pos * 0.5f + 0.5f;
                 vertices.emplace_back(pos, color);
             }
         }

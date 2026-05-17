@@ -20,7 +20,7 @@ void generateTorus(std::vector<Vertex>& vertices, std::vector<uint16_t>& indices
             float z = minorRadius * sinV;
 
             glm::vec4 pos(x, y, z, 0);
-            glm::vec3 color(0.5f + 0.5f * cosU, 0.5f + 0.5f * sinU, 0.5f + 0.5f * sinV);
+            glm::vec3 color = pos * 0.5f + 0.5f;
 
             vertices.emplace_back(pos, color);
         }

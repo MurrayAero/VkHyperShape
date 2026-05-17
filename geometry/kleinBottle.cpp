@@ -1,8 +1,13 @@
 #include "kleinBottle.h"
-void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&indices, float radius = 1, int uSegments = 60, int vSegments = 30){
+void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&indices, uint32_t twistLoops, uint32_t uSegments, uint32_t vSegments, float radius = 1.0f){
     vertices.clear();
     indices.clear();
-
+    /*
+        ​(a+bcos v cos u/2​)cos u
+        (a+b cos v cos u/2​)sin u
+        b sin v cos u / 2
+        b sin v sin u / 2
+    */
     const float a = radius, b = radius * 0.5f;
     for (int i = 0; i <= uSegments; ++i) {
         const float u = (glm::two_pi<float>() * i) / uSegments;
@@ -10,27 +15,19 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
         for (int j = 0; j <= vSegments; ++j) {
             float v = (glm::two_pi<float>() * j) / vSegments;
 
-            float x = (a + b * cosf(v)) * cosf(u);
-            float y = (a + b * cosf(v)) * sinf(u);
-            float z = b * sinf(v) * cosf(half_u);
-            float w = b * sinf(v) * sinf(half_u);
+            float x = (a + b * std::cos(v)) * std::cos(u);
+            float y = (a + b * std::cos(v)) * std::sin(u);
+            float z = b * std::sin(v) * std::cos(half_u * twistLoops);
+            float w = b * std::sin(v) * std::sin(half_u * twistLoops);
 
-            float pseudo_normal_z = sinf(v) * cosf(half_u);
-
-            float color_blend = pseudo_normal_z * 0.5f + 0.5f;
-
-            glm::vec3 color_outside = glm::vec3(1.0f, 0.1f, 0.1f);
-            glm::vec3 color_inside  = glm::vec3(0.1f, 0.1f, 1.0f);
-
-            glm::vec3 final_color = glm::mix(color_inside, color_outside, color_blend);
+            float color_blend = (w / b) * 0.5f + 0.5f; 
+            glm::vec3 color_side_A = glm::vec3(1.0f, 0.2f, 0.2f);
+            glm::vec3 color_side_B = glm::vec3(0.2f, 0.2f, 1.0f);
+            glm::vec3 final_color = glm::mix(color_side_B, color_side_A, color_blend);
             
-            vertices.push_back(Vertex(
-                glm::vec4(x , y, z, w), 
-                final_color
-            ));
+            vertices.push_back(Vertex(glm::vec4(x, y, z, w),final_color));
         }
     }
-
     for (int i = 0; i < uSegments; ++i) {
         for (int j = 0; j < vSegments; ++j) {
             uint16_t p00 = i * (vSegments + 1) + j;
@@ -105,7 +102,10 @@ void KleinBottle::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout la
 void KleinBottle::Update(const void *useData){
     std::vector<Vertex>vertices;
     std::vector<uint16_t>indices;
-    GenerateKleinBottle(vertices, indices);
+    UseData *pUseData = (UseData*)useData;
+    uint32_t vSegments = 30;
+    uint32_t uSegments = vSegments * 2;
+    GenerateKleinBottle(vertices, indices, pUseData->twistLoops, uSegments, vSegments);
     if(!mKleinBottle.IsVaildIndex() || !mKleinBottle.IsVaildVertex()){
         mKleinBottle.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mKleinBottle.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);
