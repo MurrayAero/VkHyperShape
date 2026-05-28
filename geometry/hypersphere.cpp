@@ -10,21 +10,16 @@ std::vector<Vertex>generateHypersphere(uint32_t stacksPhi, uint32_t stacksTheta,
     */
     for (uint32_t i = 0; i <= stacksPhi; ++i) {
         const float phi = glm::pi<float>() * i / stacksPhi;
-
         for (uint32_t j = 0; j <= stacksTheta; ++j) {
             const float theta = glm::pi<float>() * j / stacksTheta;
-
             for (uint32_t k = 0; k < slicesPsi; ++k) {
-                const float psi = glm::two_pi<float>() * k / slicesPsi;
-
                 const float sinPhi = sin(phi);
+                const float psi = glm::two_pi<float>() * k / slicesPsi;
                 glm::vec4 pos(sinPhi * sin(theta) * cos(psi),
-                sinPhi * sin(theta) * sin(psi),
-                sinPhi * cos(theta),
-                cos(phi));
-                glm::vec3 color = pos * 0.5f + 0.5f;
-
-                vertices.emplace_back(pos, color);
+                    sinPhi * sin(theta) * sin(psi),
+                    sinPhi * cos(theta),
+                    cos(phi));
+                vertices.emplace_back(pos, pos * 0.5f + 0.5f);
             }
         }
     }
@@ -142,6 +137,11 @@ void Hypersphere::Update(const void *useData){
 }
 
 std::vector<Vertex>generateSphere(uint32_t stackCount, uint32_t sectorCount){
+    /*
+        x = R * sin(θ) * cos(ψ)
+        y = R * sin(θ) * sin(ψ)
+        z = R * cos(θ)
+    */
     const float radius = 1.0f;
     std::vector<Vertex> vertices;
     vertices.reserve((stackCount + 1) * (sectorCount + 1));

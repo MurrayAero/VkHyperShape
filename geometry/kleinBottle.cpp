@@ -1,4 +1,21 @@
 #include "kleinBottle.h"
+glm::vec3 HsvToRgb(float h, float s, float v) {
+    int i = int(h * 6);
+    float f = h * 6 - i;
+    float p = v * (1 - s);
+    float q = v * (1 - f * s);
+    float t = v * (1 - (1 - f) * s);
+    i %= 6;
+    switch (i) {
+        case 0: return glm::vec3(v, t, p);
+        case 1: return glm::vec3(q, v, p);
+        case 2: return glm::vec3(p, v, t);
+        case 3: return glm::vec3(p, q, v);
+        case 4: return glm::vec3(t, p, v);
+        case 5: return glm::vec3(v, p, q);
+        default: return glm::vec3(0);
+    }
+}
 void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&indices, uint32_t twistLoops, uint32_t uSegments, uint32_t vSegments, float radius = 1.0f){
     vertices.clear();
     indices.clear();
@@ -20,11 +37,16 @@ void GenerateKleinBottle(std::vector<Vertex>&vertices, std::vector<uint16_t>&ind
             float z = b * std::sin(v) * std::cos(half_u * twistLoops);
             float w = b * std::sin(v) * std::sin(half_u * twistLoops);
 
+            //用于区分两侧
             float color_blend = (w / b) * 0.5f + 0.5f; 
             glm::vec3 color_side_A = glm::vec3(1.0f, 0.2f, 0.2f);
             glm::vec3 color_side_B = glm::vec3(0.2f, 0.2f, 1.0f);
             glm::vec3 final_color = glm::mix(color_side_B, color_side_A, color_blend);
-            
+            //用于证明确实翻面了
+            float hue = v / glm::two_pi<float>();
+            glm::vec3 rainbowColor = HsvToRgb(hue, 1.0f, 1.0f); 
+
+            // vertices.push_back(Vertex(glm::vec4(x, y, z, w), rainbowColor));
             vertices.push_back(Vertex(glm::vec4(x, y, z, w),final_color));
         }
     }
@@ -105,7 +127,7 @@ void KleinBottle::Update(const void *useData){
     UseData *pUseData = (UseData*)useData;
     uint32_t vSegments = 30;
     uint32_t uSegments = vSegments * 2;
-    GenerateKleinBottle(vertices, indices, pUseData->twistLoops, uSegments, vSegments);
+    GenerateKleinBottle(vertices, indices, pUseData->kleinbottle.twistLoops, uSegments, vSegments);
     if(!mKleinBottle.IsVaildIndex() || !mKleinBottle.IsVaildVertex()){
         mKleinBottle.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mKleinBottle.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

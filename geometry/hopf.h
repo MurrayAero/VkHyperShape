@@ -1,12 +1,13 @@
-#ifndef CLIFFORD_H
-#define CLIFFORD_H
+#ifndef HOPF_H
+#define HOPF_H
 #include "geometry.h"
-class Clifford:public Geometry{
+const float CLIFFORD_R = 0.70710678f; // 1/sqrt(2)
+class Hopf:public Geometry{
     vulkan::Primitive mGeometry;
     vulkan::Primitive mWireframe;
 public:
-    Clifford(/* args */);
-    ~Clifford();
+    Hopf(/* args */);
+    ~Hopf();
     virtual void Cleanup();
 
     virtual void Draw(vk::CommandBuffer command, vk::PipelineLayout layout);

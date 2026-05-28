@@ -176,10 +176,10 @@ void Pipeline::Update(const void *useData){
     const uint32_t segments = 16;
     UseData *parameter = (UseData *)useData;
     generateCurvedCylinder(vertices, indices,
-        mglm::vec4(parameter->point[0][0], parameter->point[0][1], parameter->point[0][2], parameter->point[0][3]),
-        mglm::vec4(parameter->point[1][0], parameter->point[1][1], parameter->point[1][2], parameter->point[1][3]),
-        mglm::vec4(parameter->point[2][0], parameter->point[2][1], parameter->point[2][2], parameter->point[2][3]),
-        mglm::vec4(parameter->point[3][0], parameter->point[3][1], parameter->point[3][2], parameter->point[3][3]), parameter->radius, parameter->samples, segments);
+        mglm::vec4(parameter->bezier.point[0][0], parameter->bezier.point[0][1], parameter->bezier.point[0][2], parameter->bezier.point[0][3]),
+        mglm::vec4(parameter->bezier.point[1][0], parameter->bezier.point[1][1], parameter->bezier.point[1][2], parameter->bezier.point[1][3]),
+        mglm::vec4(parameter->bezier.point[2][0], parameter->bezier.point[2][1], parameter->bezier.point[2][2], parameter->bezier.point[2][3]),
+        mglm::vec4(parameter->bezier.point[3][0], parameter->bezier.point[3][1], parameter->bezier.point[3][2], parameter->bezier.point[3][3]), parameter->bezier.radius, parameter->bezier.samples, segments);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);
@@ -224,10 +224,10 @@ void Font::Update(const void *useData){
     const uint32_t segments = 16;
     UseData parameter = *(UseData *)useData;
     generateCurvedCylinder(vertices, indices,
-        glm::vec3(parameter.point[0][0], parameter.point[0][1], parameter.point[0][2]),
-        glm::vec3(parameter.point[1][0], parameter.point[1][1], parameter.point[1][2]),
-        glm::vec3(parameter.point[2][0], parameter.point[2][1], parameter.point[2][2]),
-        glm::vec3(parameter.point[3][0], parameter.point[3][1], parameter.point[3][2]), parameter.radius, parameter.samples, segments);
+        glm::vec3(parameter.bezier.point[0][0], parameter.bezier.point[0][1], parameter.bezier.point[0][2]),
+        glm::vec3(parameter.bezier.point[1][0], parameter.bezier.point[1][1], parameter.bezier.point[1][2]),
+        glm::vec3(parameter.bezier.point[2][0], parameter.bezier.point[2][1], parameter.bezier.point[2][2]),
+        glm::vec3(parameter.bezier.point[3][0], parameter.bezier.point[3][1], parameter.bezier.point[3][2]), parameter.bezier.radius, parameter.bezier.samples, segments);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

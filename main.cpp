@@ -14,8 +14,7 @@
 #include "geometry/test.h"
 #endif
 #include "geometry/grid.h"
-#include "geometry/torus.h"
-#include "geometry/clifford.h"
+#include "geometry/hopf.h"
 #include "geometry/cylinder.h"
 #include "geometry/pipeline.h"
 #include "geometry/tesseract.h"
@@ -24,8 +23,10 @@
 #include "geometry/pentatope.h"
 #include "geometry/spherinder.h"
 #include "geometry/kleinBottle.h"
+#include "geometry/sphereCone.h"
 #include "geometry/hypersphere.h"
 #include "geometry/projectivePlane.h"
+// #define USE_PERSPECTIVE
 struct ImGuiPlaneInput{
     float angle;
     std::string splane;
@@ -44,11 +45,10 @@ struct MVP_UBO{
 struct ImGuiInput{
     struct{
         bool font = false;
-        bool torus = false;
+        bool hopf = false;
         bool grid4d = false;
         bool grid3d = false;
         bool sphere = false;
-        bool clifford = false;
         bool update = false;
         bool remake = false;
         bool pipeline = false;
@@ -59,6 +59,7 @@ struct ImGuiInput{
         bool pentatope = false;
         bool spherinder = false;
         bool kleinBottle = false;
+        bool sphereCone = false;
         bool hypersphere = false;
         bool realProjectivePlane = false;
 #ifdef DEBUG
@@ -86,17 +87,17 @@ struct ImGuiInput{
             update = true;
             remake = true;
         }
-        void SelectTorus(){
-            UnSelect();
-            torus = true;
-            update = true;
-            remake = true;
-        }
         void SelectPentatope(){
             UnSelect();
             update = true;
             remake = true;
             pentatope = true;
+        }
+        void SelectSphereCone(){
+            UnSelect();
+            update = true;
+            remake = true;
+            sphereCone = true;
         }
         void SelectIcositetra(){
             UnSelect();
@@ -116,10 +117,10 @@ struct ImGuiInput{
             remake = true;
             cylinder = true;
         }
-        void SelectClifford(){
+        void SelectHopf(){
             UnSelect();
+            hopf = true;
             update = true;
-            clifford = true;
             remake = true;
         }
         void SelectHexadeca(){
@@ -134,7 +135,7 @@ struct ImGuiInput{
             remake = true;
             kleinBottle = true;
         }
-        void SelectCylindrical(){
+        void SelectSpherinder(){
             UnSelect();
             update = true;
             remake = true;
@@ -176,6 +177,9 @@ struct ImGuiInput{
         bool custom = false;
     }rotateMode;
     bool fill = true;
+#ifndef USE_PERSPECTIVE
+    float scale = 2.0f;
+#endif
     bool ortho = false;
     UseData parameter;
     bool mutliView = false;
@@ -203,7 +207,7 @@ vulkan::Queue g_VulkanQueue;
 vulkan::Device g_VulkanDevice;
 vulkan::RenderEngine g_VulkanRenderer;
 
-uint32_t g_WindowWidth = 1000, g_WindowHeight = g_WindowWidth;
+uint32_t g_WindowWidth, g_WindowHeight;
 
 Camera g_Camera(3);
 vulkan::Buffer g_MvpUbo;
@@ -304,7 +308,7 @@ void UpdateUniform(const vulkan::Device&device){
     }
 }
 void ShowGeometry(){
-    const std::array fdCurrentItems = { "超立方体", "球柱体", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "Clifford环面", "克莱因瓶", "实射影平面", "四维网格",
+    const std::array fdCurrentItems = { "超立方体", "球柱体", "球锥体", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "hopf环面", "克莱因瓶", "实射影平面", "四维网格",
 #ifdef DEBUG
         "图元测试"
 #endif
@@ -330,14 +334,17 @@ void ShowGeometry(){
                 else if(fdGeometry == "正二十四胞体"){
                     g_ImGuiInput.geometry.SelectIcositetra();
                 }
-                else if(fdGeometry == "Clifford环面"){
-                    g_ImGuiInput.geometry.SelectClifford();
+                else if(fdGeometry == "hopf环面"){
+                    g_ImGuiInput.geometry.SelectHopf();
                 }
                 else if(fdGeometry == "克莱因瓶"){
                     g_ImGuiInput.geometry.SelectKleinBottle();
                 }
                 else if(fdGeometry == "球柱体"){
-                    g_ImGuiInput.geometry.SelectCylindrical();
+                    g_ImGuiInput.geometry.SelectSpherinder();
+                }
+                else if(fdGeometry == "球锥体"){
+                    g_ImGuiInput.geometry.SelectSphereCone();
                 }
                 else if(fdGeometry == "四维字"){
                     g_ImGuiInput.geometry.SelectFont();
@@ -361,7 +368,7 @@ void ShowGeometry(){
         }
         ImGui::EndCombo();
     }
-    const std::array tdCurrentItems = { "球", "圆柱体", "环面", "三维网格" };
+    const std::array tdCurrentItems = { "球", "圆柱体", "三维网格" };
     static std::string tdGeometry = tdCurrentItems[0];
     if(ImGui::BeginCombo("三维几何", tdGeometry.c_str())){
         for (auto currentGeometry = tdCurrentItems.begin(); currentGeometry != tdCurrentItems.end(); ++currentGeometry){
@@ -373,9 +380,6 @@ void ShowGeometry(){
                 }
                 else if(tdGeometry == "圆柱体"){
                     g_ImGuiInput.geometry.SelectCylinder();
-                }
-                else if(tdGeometry == "环面"){
-                    g_ImGuiInput.geometry.SelectTorus();
                 }
                 else if(tdGeometry == "三维网格"){
                     g_ImGuiInput.geometry.SelectGrid3D();
@@ -497,32 +501,43 @@ void UpdateImGui(vk::CommandBuffer command){
                 UpdateUniform(g_VulkanDevice);
             }
         }
+#ifndef USE_PERSPECTIVE
+        if(ImGui::InputFloat("缩放", &g_ImGuiInput.scale)){
+            UpdateUniform(g_VulkanDevice);
+        }
+#endif
         ImGui::SeparatorText("四维旋转");
         ShowRotate();
         ImGui::SeparatorText("几何");
         ShowGeometry();
         ImGui::SeparatorText("几何参数");
         if(g_ImGuiInput.geometry.kleinBottle){
-            if(ImGui::SliderInt("扭转次数", &g_ImGuiInput.parameter.twistLoops, 0, 5)){
+            if(ImGui::SliderInt("扭转次数", &g_ImGuiInput.parameter.kleinbottle.twistLoops, 0, 5)){
                 g_ImGuiInput.geometry.update = true;
             }
         }
-        if(g_ImGuiInput.geometry.clifford){
-            if(ImGui::SliderFloat("时间", &g_ImGuiInput.parameter.cliffordTime, 0, 1)){
+        if(g_ImGuiInput.geometry.hopf){
+            if(ImGui::Checkbox("克莱福环面", &g_ImGuiInput.parameter.hopf.clifford)){
+                g_ImGuiInput.parameter.hopf.r = CLIFFORD_R;
                 g_ImGuiInput.geometry.update = true;
+            }
+            if(!g_ImGuiInput.parameter.hopf.clifford){
+                if(ImGui::SliderFloat("r", &g_ImGuiInput.parameter.hopf.r, 0.05, 1)){
+                    g_ImGuiInput.geometry.update = true;
+                }
             }
         }
         if(g_ImGuiInput.geometry.pipeline || g_ImGuiInput.geometry.font){
-            if(ImGui::InputFloat("半径", &g_ImGuiInput.parameter.radius)){
+            if(ImGui::InputFloat("半径", &g_ImGuiInput.parameter.bezier.radius)){
                 g_Geometry->Update(&g_ImGuiInput.parameter);
             }
-            if(ImGui::InputFloat("采样率", &g_ImGuiInput.parameter.samples)){
+            if(ImGui::InputFloat("采样率", &g_ImGuiInput.parameter.bezier.samples)){
                 g_Geometry->Update(&g_ImGuiInput.parameter);
             }
             for (size_t i = 0; i < 4; i++){
                 char label[0xff];
                 sprintf(label, "点%d", i);
-                if(ImGui::InputFloat4(label, g_ImGuiInput.parameter.point[i].data())){
+                if(ImGui::InputFloat4(label, g_ImGuiInput.parameter.bezier.point[i].data())){
                     g_Geometry->Update(&g_ImGuiInput.parameter);
                 }
             }
@@ -534,9 +549,18 @@ void UpdateImGui(vk::CommandBuffer command){
     const bool isMinimized = (draw_data->DisplaySize.x <=.0f || draw_data->DisplaySize.y <= .0f);
     if(!isMinimized)g_VulkanImGui.RenderDrawData(command, draw_data);
 }
+// Geometry *g_Hs;
 void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t count){
     PushConstant pc;
+#ifdef USE_PERSPECTIVE
     pc.model = glm::mat4(1.0f);
+    pc.projection = glm::perspective(glm::radians(45.0f), (float)g_WindowWidth / g_WindowHeight, 0.1f, 100.0f);
+    pc.projection[1][1] *= -1;
+#else
+    pc.model = glm::scale(glm::mat4(1.0f), glm::vec3(g_ImGuiInput.scale));
+    float distance = mglm::distance(g_CameraPos[0], mglm::vec4(0));
+    pc.projection = glm::ortho(-distance, distance, -distance, distance, -distance * 10, distance * 10);
+#endif
     if(g_ImGuiInput.fill){
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline[0]);
     }
@@ -547,6 +571,7 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
 #ifdef ENABE_DEPTH_TEST
     command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 2, g_DepthTest.set, {});
 #endif
+    vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
     uint32_t dynamicOffsets = 0;
     if(g_ImGuiInput.mutliView){
         for(uint32_t i = 0; i < 4; ++i){
@@ -555,12 +580,10 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
             const uint32_t height = g_WindowHeight / 2;
             const uint32_t offsetX = (i % 2) * g_WindowWidth / 2;
             const uint32_t offsetY = (i / 2) * g_WindowHeight / 2;
-            pc.projection = glm::perspective(glm::radians(45.0f), (float)width / height, 0.1f, 100.0f);
-            pc.projection[1][1] *= -1;
             command.setScissor(0, vulkan::pipeline::initializers::scissor(width, height, offsetX, offsetY));
             command.setViewport(0, vulkan::pipeline::initializers::viewport(width, height, offsetX, offsetY));
             command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
-            vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
+
             if(g_ImGuiInput.fill){
                 g_Geometry->Draw(command, g_Pipeline.layout);
             }
@@ -570,16 +593,20 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
         }
     }
     else{
+        // if(!g_Hs){
+        //     g_Hs = new Hypersphere;
+        //     g_Hs->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
+        //     g_Hs->Update();
+        // }
         command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
-        pc.projection = glm::perspective(glm::radians(45.0f), (float)g_WindowWidth / g_WindowHeight, 0.1f, 100.0f);
-        pc.projection[1][1] *= -1;
         command.setScissor(0, vulkan::pipeline::initializers::scissor(g_WindowWidth, g_WindowHeight));
         command.setViewport(0, vulkan::pipeline::initializers::viewport(g_WindowWidth, g_WindowHeight));
-        vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
         if(g_ImGuiInput.fill){
+            // g_Hs->Draw(command, g_Pipeline.layout);
             g_Geometry->Draw(command, g_Pipeline.layout);
         }
         else{
+            // g_Hs->DrawWireframe(command, g_Pipeline.layout);
             g_Geometry->DrawWireframe(command, g_Pipeline.layout);
         }
     }
@@ -704,7 +731,6 @@ void CreateGraphicsPipeline(vk::Device device, VkPipelineLayout layout){
     inputState.vertexAttributeDescriptionCount = attributeDescriptions.size();
     shaderStages[0] = vulkan::pipeline::tools::loadShader(device, "shaders/base.vert.spv", vk::ShaderStageFlagBits::eVertex);
     shaderStages[1] = vulkan::pipeline::tools::loadShader(device, "shaders/base.frag.spv", vk::ShaderStageFlagBits::eFragment);
-    // pipelineCreateInfo.pTessellationState = ;
     vk::PipelineRenderingCreateInfo renderingInfo;
     if(g_VulkanDevice.IsEnableDynamicRendering()){
         renderingInfo.colorAttachmentCount = 1;
@@ -810,6 +836,9 @@ void Setup(GLFWwindow *window){
     g_Plane[0].plane = mglm::planes::XY;
     g_Plane[1].plane = mglm::planes::ZW;
 
+    g_ImGuiInput.parameter.hopf.clifford = true;
+    g_ImGuiInput.parameter.hopf.r = CLIFFORD_R;
+
     g_Geometry = new Tesseract;
     g_Geometry->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
     g_Geometry->Update();
@@ -891,20 +920,20 @@ void display(GLFWwindow* window){
         else if(g_ImGuiInput.geometry.icositetra){
             g_Geometry = new Icositetra;
         }
-        else if(g_ImGuiInput.geometry.clifford){
-            g_Geometry = new Clifford;
+        else if(g_ImGuiInput.geometry.hopf){
+            g_Geometry = new Hopf;
         }
         else if(g_ImGuiInput.geometry.font){
             g_Geometry = new Font;
-        }
-        else if(g_ImGuiInput.geometry.torus){
-            g_Geometry = new Torus;
         }
         else if(g_ImGuiInput.geometry.cylinder){
             g_Geometry = new Cylinder;
         }
         else if(g_ImGuiInput.geometry.pipeline){
             g_Geometry = new Pipeline;
+        }
+        else if(g_ImGuiInput.geometry.sphereCone){
+            g_Geometry = new SphereCone;
         }
         else if(g_ImGuiInput.geometry.kleinBottle){
             g_Geometry = new KleinBottle;
@@ -1016,8 +1045,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         return 1;
     }
     auto screenSize = GetScreenSize();
-    if(g_WindowWidth > screenSize.x)g_WindowWidth = screenSize.x * .8;
-    if(g_WindowHeight > screenSize.y)g_WindowHeight = screenSize.y * .8;
+    g_WindowWidth = std::min(screenSize.x, screenSize.y) * .8;
+    g_WindowHeight = g_WindowWidth;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(g_WindowWidth, g_WindowHeight, "demo", NULL, NULL);
     // Setup Vulkan
@@ -1060,8 +1089,8 @@ int main(){
         return 1;
     }
     auto screenSize = GetScreenSize();
-    if(g_WindowWidth > screenSize.x)g_WindowWidth = screenSize.x * .8;
-    if(g_WindowHeight > screenSize.y)g_WindowHeight = screenSize.y * .8;
+    g_WindowWidth = std::min(screenSize.x, screenSize.y) * .8;
+    g_WindowHeight = g_WindowWidth;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(g_WindowWidth, g_WindowHeight, "demo", NULL, NULL);
     // Setup Vulkan

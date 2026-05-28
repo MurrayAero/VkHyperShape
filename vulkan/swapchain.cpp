@@ -80,7 +80,7 @@ namespace vulkan{
             extent.height = std::clamp(height, swapChainSupport.capabilities.minImageExtent.height, swapChainSupport.capabilities.maxImageExtent.height);
         }
 
-        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        uint32_t imageCount = std::clamp(swapChainSupport.capabilities.minImageCount + 1, 2u, 3u);
         //maxImageCount为0表示没有图片限制
         if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
             imageCount = swapChainSupport.capabilities.maxImageCount;
