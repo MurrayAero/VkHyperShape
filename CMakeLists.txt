@@ -66,15 +66,9 @@ target_link_directories(demo PRIVATE
     "${CMAKE_CURRENT_DIR}/geometry/$<CONFIG>"
     "${CMAKE_CURRENT_DIR}/imgui_impl/$<CONFIG>"
 )
-target_link_libraries(demo PRIVATE 
+target_link_libraries(demo
+    PRIVATE
     imgui_impl_cpp
-)
-target_link_libraries(demo PRIVATE 
     imgui_cpp
-)
-target_link_libraries(demo PRIVATE 
     vulkan_cpp
-)
-target_link_libraries(demo PRIVATE 
-    geometry_cpp
 )

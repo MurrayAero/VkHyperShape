@@ -232,7 +232,8 @@ namespace vulkan{
                 thread[i].join();//不应该让主线程空闲
             }
         }
-        vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, synchronize[currentFrame].imageAcquired, VK_NULL_HANDLE, &currentFrame);
+        uint32_t imageIndex;
+        vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, synchronize[currentFrame].imageAcquired, VK_NULL_HANDLE, &imageIndex);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)){
             recreateSwapchain(userData);
             for (auto&it:synchronize){
@@ -245,9 +246,9 @@ namespace vulkan{
         else if(result != vk::Result::eSuccess){
             VK_CHECK_LOG(mLogger, result);
         }
-        recordCommand(commandBuffers[currentFrame], swapchain.GetImage(currentFrame), depthStencil);
+        recordCommand(commandBuffers[currentFrame], swapchain.GetImage(imageIndex), depthStencil);
         Submit(commandBuffers[currentFrame], vulkanQueue.graphics, synchronize[currentFrame].imageAcquired, synchronize[currentFrame].renderComplete, synchronize[currentFrame].fences);
-        result = Present(currentFrame, vulkanQueue.present, synchronize[currentFrame].renderComplete);
+        result = Present(imageIndex, vulkanQueue.present, synchronize[currentFrame].renderComplete);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)) {
             recreateSwapchain(userData);
             return;
@@ -269,7 +270,8 @@ namespace vulkan{
                 thread[i].join();//不应该让主线程空闲
             }
         }
-        vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, synchronize[currentFrame].imageAcquired, VK_NULL_HANDLE, &currentFrame);
+        uint32_t imageIndex;
+        vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, synchronize[currentFrame].imageAcquired, VK_NULL_HANDLE, &imageIndex);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)){
             recreateSwapchain(userData);
             for (auto&it:synchronize){
@@ -284,7 +286,7 @@ namespace vulkan{
         }
         recordCommand(commandBuffers[currentFrame], framebuffers[currentFrame], renderPass);
         Submit(commandBuffers[currentFrame], vulkanQueue.graphics, synchronize[currentFrame].imageAcquired, synchronize[currentFrame].renderComplete, synchronize[currentFrame].fences);
-        result = Present(currentFrame, vulkanQueue.present, synchronize[currentFrame].renderComplete);
+        result = Present(imageIndex, vulkanQueue.present, synchronize[currentFrame].renderComplete);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)) {
             recreateSwapchain(userData);
             return;
@@ -295,7 +297,7 @@ namespace vulkan{
         currentFrame = (currentFrame + 1) % swapchain.GetImageSize();
     }
     void RenderEngine::Submit(const vk::CommandBuffer&commandbuffers, vk::Queue graphics, const vk::Semaphore&imageAcquired, const vk::Semaphore&renderComplete, const vk::Fence&fence){
-    vk::SubmitInfo submitInfo = {};
+        vk::SubmitInfo submitInfo = {};
         vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
         submitInfo.sType = vk::StructureType::eSubmitInfo;
         submitInfo.commandBufferCount = 1;

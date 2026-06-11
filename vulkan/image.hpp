@@ -16,10 +16,10 @@ namespace vulkan{
         void Copy(vk::CommandBuffer command, Image&src);
         template <typename ImageType>
         void Copy(const Device& device, const ImageType* datas, uint32_t count, vk::Queue queue, const Pool& pool) {
-            std::vector<unsigned char*>imageDatas(count);
-            const uint32_t imageSize = size.width * size.height * pixelSize;
+            std::vector<ImageType*>imageDatas(count);
+            const uint32_t imageSize = size.width * size.height * size.depth * pixelSize;
             for (size_t i = 0; i < count; i++) {
-                imageDatas[i] = new unsigned char[imageSize];
+                imageDatas[i] = new ImageType[imageSize];
                 memcpy(imageDatas[i], datas + imageSize * i, imageSize);
             }
             Copy(device, imageDatas, queue, pool);
@@ -30,7 +30,7 @@ namespace vulkan{
         template <typename ImageType>
         void Copy(const Device& device, const std::vector<ImageType>& datas, vk::Queue queue, const Pool& pool) {
             Buffer tempStorageBuffer;
-            const uint32_t imageSize = size.width * size.height * pixelSize;
+            const uint32_t imageSize = size.width * size.height * size.depth * pixelSize;
             tempStorageBuffer.Create(device, imageSize * datas.size(), vk::BufferUsageFlagBits::eTransferSrc, vma::MemoryUsage::eCpuToGpu);
             for (size_t i = 0; i < datas.size(); i++) {
                 tempStorageBuffer.UpdateData(device, imageSize, datas[i], i * imageSize);

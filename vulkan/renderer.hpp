@@ -56,13 +56,6 @@ namespace vulkan{
         void Setup(const Device&device, uint32_t width, uint32_t height, const vulkan::Pool&pool);
         void SetThreadFun(void(*threadFun)(vk::CommandBuffer, uint32_t), uint32_t threadCount)noexcept;
         void Submit(const vk::CommandBuffer&commandbuffers, vk::Queue graphics, const vk::Semaphore&imageAcquired, const vk::Semaphore&renderComplete, const vk::Fence&fence = VK_NULL_HANDLE);
-
-        inline auto FrameEnd()const noexcept{
-            return framebuffers.end();
-        }
-        inline auto FrameBegin()const noexcept{
-            return framebuffers.begin();
-        }
         inline auto&GetSurface()const noexcept{
             return surface;
         }

@@ -63,7 +63,7 @@ struct ImGuiInput{
         bool hypersphere = false;
         bool realProjectivePlane = false;
 #ifdef DEBUG
-    bool testGeometry = false;
+        bool testGeometry = false;
 #endif
         void UnSelect(){
             memset(this, 0, sizeof(*this));
@@ -72,6 +72,7 @@ struct ImGuiInput{
         void SeletctTestGeometry(){
             UnSelect();
             update = true;
+            remake = true;
             testGeometry = true;
         }
 #endif
@@ -180,9 +181,13 @@ struct ImGuiInput{
 #ifndef USE_PERSPECTIVE
     float scale = 2.0f;
 #endif
-    bool ortho = false;
     UseData parameter;
+    bool ortho = false;
     bool mutliView = false;
+    bool stopRotate = true;
+    uint32_t planeIndex = 0;
+    bool randomAngle = false;
+    bool doubleRotate = false;
 };
 struct PushConstant{
     glm::mat4 model;
@@ -308,13 +313,13 @@ void UpdateUniform(const vulkan::Device&device){
     }
 }
 void ShowGeometry(){
-    const std::array fdCurrentItems = { "超立方体", "球柱体", "球锥体", "超球", "贝塞尔管道", "四维字", "正五胞体", "正十六胞体", "正二十四胞体", "hopf环面", "克莱因瓶", "实射影平面", "四维网格",
+    const std::array fdCurrentItems = { "超立方体", "正五胞体", "正十六胞体", "正二十四胞体", "四维网格", "球柱体", "球锥体", "超球", "hopf环面", "克莱因瓶", "实射影平面", "贝塞尔管道", "四维字",
 #ifdef DEBUG
         "图元测试"
 #endif
     };
     static std::string fdGeometry = fdCurrentItems[0];
-    if(ImGui::BeginCombo("四维几何", fdGeometry.c_str())){
+    if(ImGui::BeginCombo("四维", fdGeometry.c_str())){
         for (auto currentGeometry = fdCurrentItems.begin(); currentGeometry != fdCurrentItems.end(); ++currentGeometry){
             bool is_selected = fdGeometry == *currentGeometry;
             if (ImGui::Selectable(*currentGeometry, is_selected)){
@@ -370,7 +375,7 @@ void ShowGeometry(){
     }
     const std::array tdCurrentItems = { "球", "圆柱体", "三维网格" };
     static std::string tdGeometry = tdCurrentItems[0];
-    if(ImGui::BeginCombo("三维几何", tdGeometry.c_str())){
+    if(ImGui::BeginCombo("三维", tdGeometry.c_str())){
         for (auto currentGeometry = tdCurrentItems.begin(); currentGeometry != tdCurrentItems.end(); ++currentGeometry){
             bool is_selected = tdGeometry == *currentGeometry;
             if (ImGui::Selectable(*currentGeometry, is_selected)){
@@ -442,22 +447,47 @@ void ShowRotate(){
             g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
         }
     }
-    static bool syncAngle;
-    ImGui::Checkbox("同步角度", &syncAngle);
+    ImGui::BeginDisabled(!g_ImGuiInput.stopRotate);
+    ImGui::Checkbox("双旋转", &g_ImGuiInput.doubleRotate);
     if(ImGui::SliderFloat("平面一角度", &g_Plane[0].angle, 0, 360)){
-        if(syncAngle){
+        if(g_ImGuiInput.doubleRotate){
             g_Plane[1].angle = g_Plane[0].angle;
         }
         UpdateUniform(g_VulkanDevice);
     }
     if(ImGui::SliderFloat("平面二角度", &g_Plane[1].angle, 0, 360)){
-        if(syncAngle){
+        if(g_ImGuiInput.doubleRotate){
             g_Plane[0].angle = g_Plane[1].angle;
         }
         UpdateUniform(g_VulkanDevice);
     }
+    ImGui::EndDisabled();
 }
-
+void RotateAnimation(){
+    const std::array plane = { mglm::planes::XY, mglm::planes::XZ, mglm::planes::YZ, mglm::planes::XW, mglm::planes::YW, mglm::planes::ZW };
+    float angle = 0;
+    while (!g_ImGuiInput.stopRotate){
+        if(g_ImGuiInput.randomAngle){
+            g_Plane[0].angle = rand() % 360;
+            if(g_ImGuiInput.doubleRotate)g_Plane[1].angle = rand() % 360;
+        }
+        else{
+            g_Plane[0].angle = angle;
+            if(g_ImGuiInput.doubleRotate)g_Plane[1].angle = angle;
+            angle = ((uint32_t)angle + 1) % 360;
+        }
+        if(g_ImGuiInput.planeIndex > 5){
+            g_Plane[0].plane.u = mglm::vec4((rand() % 101) * .001f, (rand() % 101) * .001f, (rand() % 101) * .001f, (rand() % 101) * .001f);
+            g_Plane[0].plane.u = mglm::normalize(g_Plane[0].plane.u);
+        }
+        else{
+            g_Plane[0].plane = plane[g_ImGuiInput.planeIndex];
+        }
+        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
+        UpdateUniform(g_VulkanDevice);
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+}
 void UpdateImGui(vk::CommandBuffer command){
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -474,6 +504,68 @@ void UpdateImGui(vk::CommandBuffer command){
             if(ImGui::MenuItem("预设")){
                 g_ImGuiInput.rotateMode.preset = true;
                 g_ImGuiInput.rotateMode.custom = false;
+            }
+            if(ImGui::BeginMenu("动画")){
+                ImGui::MenuItem("停止", nullptr, &g_ImGuiInput.stopRotate);
+                ImGui::MenuItem("双旋转", nullptr, &g_ImGuiInput.doubleRotate);
+                ImGui::MenuItem("随机角度", nullptr, &g_ImGuiInput.randomAngle);
+                if(ImGui::MenuItem("XY")){
+                    g_ImGuiInput.planeIndex = 0;
+                    if(g_ImGuiInput.stopRotate){
+                        g_ImGuiInput.stopRotate = false;
+                        std::thread thread(RotateAnimation);
+                        thread.detach();
+                    }
+                }
+                if(ImGui::MenuItem("XZ")){
+                    g_ImGuiInput.planeIndex = 1;
+                    if(g_ImGuiInput.stopRotate){
+                        g_ImGuiInput.stopRotate = false;
+                        std::thread thread(RotateAnimation);
+                        thread.detach();
+                    }
+                }
+                if(ImGui::MenuItem("YZ")){
+                    g_ImGuiInput.planeIndex = 2;
+                    if(g_ImGuiInput.stopRotate){
+                        g_ImGuiInput.stopRotate = false;
+                        std::thread thread(RotateAnimation);
+                        thread.detach();
+                    }
+                }
+                if(ImGui::MenuItem("XW")){
+                    g_ImGuiInput.planeIndex = 3;
+                    if(g_ImGuiInput.stopRotate){
+                        g_ImGuiInput.stopRotate = false;
+                        std::thread thread(RotateAnimation);
+                        thread.detach();
+                    }
+                }
+                if(ImGui::MenuItem("YW")){
+                    g_ImGuiInput.planeIndex = 4;
+                    if(g_ImGuiInput.stopRotate){
+                        g_ImGuiInput.stopRotate = false;
+                        std::thread thread(RotateAnimation);
+                        thread.detach();
+                    }
+                }
+                if(ImGui::MenuItem("ZW")){
+                    g_ImGuiInput.planeIndex = 5;
+                    if(g_ImGuiInput.stopRotate){
+                        g_ImGuiInput.stopRotate = false;
+                        std::thread thread(RotateAnimation);
+                        thread.detach();
+                    }
+                }
+                if(ImGui::MenuItem("随机")){
+                    g_ImGuiInput.planeIndex = 6;
+                    if(g_ImGuiInput.stopRotate){
+                        g_ImGuiInput.stopRotate = false;
+                        std::thread thread(RotateAnimation);
+                        thread.detach();
+                    }
+                }
+                ImGui::EndMenu();
             }
             ImGui::EndMenu();
         }
@@ -517,23 +609,29 @@ void UpdateImGui(vk::CommandBuffer command){
             }
         }
         if(g_ImGuiInput.geometry.hopf){
-            if(ImGui::Checkbox("克莱福环面", &g_ImGuiInput.parameter.hopf.clifford)){
-                g_ImGuiInput.parameter.hopf.r = CLIFFORD_R;
+            if(ImGui::Checkbox("clifford环面", &g_ImGuiInput.parameter.hopf.clifford)){
+                g_ImGuiInput.parameter.hopf.torusAspect = CLIFFORD_R;
                 g_ImGuiInput.geometry.update = true;
             }
             if(!g_ImGuiInput.parameter.hopf.clifford){
-                if(ImGui::SliderFloat("r", &g_ImGuiInput.parameter.hopf.r, 0.05, 1)){
+                if(ImGui::SliderFloat("主圆半径", &g_ImGuiInput.parameter.hopf.torusAspect, 0, 1)){
                     g_ImGuiInput.geometry.update = true;
                 }
             }
+            // if(ImGui::SliderInt("lobeCount", &g_ImGuiInput.parameter.hopf.lobeCount, 0, 5)){
+            //     g_ImGuiInput.geometry.update = true;
+            // }
+            // if(ImGui::SliderFloat("时间", &g_ImGuiInput.parameter.hopf.time, 0, 1)){
+            //     g_ImGuiInput.geometry.update = true;
+            // }
         }
         if(g_ImGuiInput.geometry.pipeline || g_ImGuiInput.geometry.font){
             if(ImGui::InputFloat("半径", &g_ImGuiInput.parameter.bezier.radius)){
                 g_Geometry->Update(&g_ImGuiInput.parameter);
             }
-            if(ImGui::InputFloat("采样率", &g_ImGuiInput.parameter.bezier.samples)){
-                g_Geometry->Update(&g_ImGuiInput.parameter);
-            }
+            // if(ImGui::InputFloat("采样率", &g_ImGuiInput.parameter.bezier.samples)){
+            //     g_Geometry->Update(&g_ImGuiInput.parameter);
+            // }
             for (size_t i = 0; i < 4; i++){
                 char label[0xff];
                 sprintf(label, "点%d", i);
@@ -549,17 +647,43 @@ void UpdateImGui(vk::CommandBuffer command){
     const bool isMinimized = (draw_data->DisplaySize.x <=.0f || draw_data->DisplaySize.y <= .0f);
     if(!isMinimized)g_VulkanImGui.RenderDrawData(command, draw_data);
 }
+glm::uvec2 calculateViewport(uint32_t windowWidth, uint32_t windowHeight, vk::Extent2D&exent){
+    const float targetAspect = 1.0f;
+    
+    glm::uvec2 offset = glm::uvec2(0);
+    exent.width = windowWidth;
+    exent.height = windowHeight;
+    const float windowAspect = (float)windowWidth / (float)windowHeight;
+
+    if (windowAspect > targetAspect) {
+        exent.height = windowHeight;
+        exent.width = static_cast<int>(windowHeight * targetAspect);
+        offset.x = (windowWidth - exent.width) / 2;
+    } else {
+        exent.width = windowWidth;
+        exent.height = static_cast<int>(windowWidth / targetAspect);
+        offset.y = (windowHeight - exent.height) / 2;
+    }
+    return offset;
+}
+void updateViewport(vk::CommandBuffer command, uint32_t windowWidth, uint32_t windowHeight) {
+    vk::Extent2D extent;
+    auto offset = calculateViewport(windowWidth, windowHeight, extent);
+    command.setScissor(0, vulkan::pipeline::initializers::scissor(extent.width, extent.height, offset.x, offset.y));
+    command.setViewport(0, vulkan::pipeline::initializers::viewport(extent.width, extent.height, offset.x, offset.y));
+}
 // Geometry *g_Hs;
 void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t count){
     PushConstant pc;
 #ifdef USE_PERSPECTIVE
     pc.model = glm::mat4(1.0f);
-    pc.projection = glm::perspective(glm::radians(45.0f), (float)g_WindowWidth / g_WindowHeight, 0.1f, 100.0f);
+    pc.projection = glm::perspective(glm::radians(45.0f), .1f, 0.1f, 100.0f);
     pc.projection[1][1] *= -1;
 #else
+    float aspect = (float)g_WindowWidth / (float)g_WindowHeight;
     pc.model = glm::scale(glm::mat4(1.0f), glm::vec3(g_ImGuiInput.scale));
     float distance = mglm::distance(g_CameraPos[0], mglm::vec4(0));
-    pc.projection = glm::ortho(-distance, distance, -distance, distance, -distance * 10, distance * 10);
+    pc.projection = glm::ortho(-distance * aspect, distance * aspect, -distance, distance, -distance * 10, distance * 10);
 #endif
     if(g_ImGuiInput.fill){
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline[0]);
@@ -574,12 +698,18 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
     vkCmdPushConstants(command, g_Pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pc);
     uint32_t dynamicOffsets = 0;
     if(g_ImGuiInput.mutliView){
+        vk::Extent2D extent;
+#ifdef USE_PERSPECTIVE
+        claceViewport(g_WindowWidth, g_WindowHeight, extent);
+#else
+        extent = vk::Extent2D(g_WindowWidth, g_WindowHeight);
+#endif
         for(uint32_t i = 0; i < 4; ++i){
             dynamicOffsets = i * g_MvpUbo.GetSize();
-            const uint32_t width = g_WindowWidth / 2;
-            const uint32_t height = g_WindowHeight / 2;
-            const uint32_t offsetX = (i % 2) * g_WindowWidth / 2;
-            const uint32_t offsetY = (i / 2) * g_WindowHeight / 2;
+            const uint32_t width = extent.width / 2;
+            const uint32_t height = extent.height / 2;
+            const uint32_t offsetX = (i % 2) * extent.width / 2;
+            const uint32_t offsetY = (i / 2) * extent.height / 2;
             command.setScissor(0, vulkan::pipeline::initializers::scissor(width, height, offsetX, offsetY));
             command.setViewport(0, vulkan::pipeline::initializers::viewport(width, height, offsetX, offsetY));
             command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
@@ -598,6 +728,9 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
         //     g_Hs->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
         //     g_Hs->Update();
         // }
+#ifdef USE_PERSPECTIVE
+        updateViewport(command, g_WindowWidth, g_WindowHeight);
+#endif
         command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
         command.setScissor(0, vulkan::pipeline::initializers::scissor(g_WindowWidth, g_WindowHeight));
         command.setViewport(0, vulkan::pipeline::initializers::viewport(g_WindowWidth, g_WindowHeight));
@@ -836,8 +969,7 @@ void Setup(GLFWwindow *window){
     g_Plane[0].plane = mglm::planes::XY;
     g_Plane[1].plane = mglm::planes::ZW;
 
-    g_ImGuiInput.parameter.hopf.clifford = true;
-    g_ImGuiInput.parameter.hopf.r = CLIFFORD_R;
+    g_ImGuiInput.parameter.hopf.torusAspect = CLIFFORD_R;
 
     g_Geometry = new Tesseract;
     g_Geometry->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);

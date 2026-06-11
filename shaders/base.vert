@@ -56,6 +56,6 @@ void main() {
     v_clip_w = point.w;
 	gl_Position = pc.projection * ubo.view * pc.model * vec4(vec3(point), 1.0f);
 
-    // float w_norm = point.w * 0.5 + 0.5;
-    // gl_Position.z = w_norm * gl_Position.w;
+   //  float w_norm = point.w * 0.5 + 0.5;
+   // gl_Position.z = w_norm * gl_Position.w;
 }

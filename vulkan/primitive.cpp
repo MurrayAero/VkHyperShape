@@ -6,7 +6,6 @@ namespace vulkan{
     }
 
     void Primitive::CreateVertexBuffer(const Device&device, vk::DeviceSize size, uint32_t vertexCount, bool hostvisible){
-        if(vertex.GetSize() >= size)return;
         if(vertexCount)this->vertexCount = vertexCount;
         if(hostvisible){
             vertex.Create(device, size, vk::BufferUsageFlagBits::eVertexBuffer, vma::MemoryUsage::eCpuToGpu);

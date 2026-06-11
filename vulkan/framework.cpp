@@ -39,14 +39,14 @@ const char *cvmx_chip_type_to_string(vk::Result type){
 }
 namespace vulkan{
     namespace framework{
-        vk::Sampler CreateTextureSampler(vk::Device device){
+        vk::Sampler CreateTextureSampler(vk::Device device, vk::SamplerAddressMode addressMode, vk::Filter filter){
             vk::SamplerCreateInfo createInfo = {};
             createInfo.sType = vk::StructureType::eSamplerCreateInfo;
-            createInfo.magFilter = vk::Filter::eLinear;
-            createInfo.minFilter = vk::Filter::eLinear;
-            createInfo.addressModeU = vk::SamplerAddressMode::eRepeat;
-            createInfo.addressModeV = vk::SamplerAddressMode::eRepeat;
-            createInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
+            createInfo.magFilter = filter;
+            createInfo.minFilter = filter;
+            createInfo.addressModeU = addressMode;
+            createInfo.addressModeV = addressMode;
+            createInfo.addressModeW = addressMode;
             createInfo.anisotropyEnable = VK_TRUE;
             createInfo.maxAnisotropy = 16;
             createInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
@@ -137,7 +137,7 @@ namespace vulkan{
                 it->SetLayout(command, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits::eBottomOfPipe, vk::AccessFlagBits::eMemoryRead);
             }
         }
-        void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &textureSampler, bool shaderReadOnlyImageLayout){
+        void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler, bool shaderReadOnlyImageLayout){
             std::array<uint32_t, 2>index = {};//一个uniform一个图片采样器。如果需要其他则个数必须增加
             std::vector<vk::WriteDescriptorSet>writeDescriptorSets;
             std::vector<vk::DescriptorBufferInfo>descriptorBufferInfo(buffer.size());
@@ -156,7 +156,7 @@ namespace vulkan{
                 //fallthrough表示上一个case没加brak是有意的
                 [[likely]]case vk::DescriptorType::eCombinedImageSampler:
                     if(index[1] < image.size()){
-                        descriptorImageInfo[index[1]].sampler = textureSampler;
+                        descriptorImageInfo[index[1]].sampler = sampler;
                         descriptorImageInfo[index[1]].imageView = image[index[1]].GetView();
                         if(bindings[i].descriptorType == vk::DescriptorType::eStorageImage){
                             descriptorImageInfo[index[1]].imageLayout = vk::ImageLayout::eGeneral;

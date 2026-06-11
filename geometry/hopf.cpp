@@ -1,5 +1,6 @@
-#include "hopf.h"
 #include <complex>
+
+#include "hopf.h"
 std::vector<Vertex> generateHopfTorusLayer(float r, uint32_t uSegments, uint32_t vSegments) {
     std::vector<Vertex> vertices;
     float r_prime = std::sqrt(1.0f - r * r); 
@@ -7,78 +8,19 @@ std::vector<Vertex> generateHopfTorusLayer(float r, uint32_t uSegments, uint32_t
     for (uint32_t i = 0; i < uSegments; ++i) {
         float u = glm::two_pi<float>() * float(i) / float(uSegments);
         std::complex<float>z0 = std::polar(r, u); // z0 的模长现在是 r
-
         for (uint32_t j = 0; j < vSegments; ++j) {
             float v = glm::two_pi<float>() * float(j) / float(vSegments);
             std::complex<float>z1 = std::polar(r_prime, v); // z1 的模长现在是 r_prime
 
             glm::vec4 pos(z0.real(), z0.imag(), z1.real(), z1.imag());
-            
-            glm::vec3 color(r, 1.0f - r, float(j) / vSegments); 
-            vertices.emplace_back(pos, color);
-        }
-    }
-    return vertices;
-}
-std::vector<Vertex> generateHopfTorusVertices_Complex(uint32_t uSegments, uint32_t vSegments) {
-    std::vector<Vertex> vertices;
-    vertices.reserve(uSegments * vSegments);
-
-    // 1. 这就是那个关键的 "r"
-    // 当 r = 1/sqrt(2) 时，我们在 S³ 的 "赤道" 上切出了一个最胖的环面
-    float r = CLIFFORD_R; 
-    float r_prime = std::sqrt(1.0f - r * r); // 因为要在 S³ 上，所以 |z1| = sqrt(1-|z0|^2)
-
-    for (uint32_t i = 0; i < uSegments; ++i) {
-        // u 是第一个复数 z0 的相位 (Phase)
-        float u = glm::two_pi<float>() * float(i) / float(uSegments);
-        
-        // 2. 构造第一个复数 z0 = r * e^(i*u)
-        // 它的模长固定为 r，相位是 u
-        std::complex<float>z0 = std::polar(r, u);
-
-        for (uint32_t j = 0; j < vSegments; ++j) {
-            float v = glm::two_pi<float>() * float(j) / float(vSegments);
-
-            // 3. 构造第二个复数 z1 = r' * e^(i*v)
-            // 它的模长固定为 r'，相位是 v
-            std::complex<float>z1 = std::polar(r_prime, v);
-
-            // 4. 这就是 S³ 上的点！
-            // 因为 |z0|^2 + |z1|^2 = r^2 + (1-r^2) = 1
-            // 它完美符合 S³ 的定义
-            glm::vec4 pos(z0.real(), z0.imag(), z1.real(), z1.imag());
-
-            // 颜色逻辑：通常我们用 u 和 v 来着色，方便观察
-            // u 代表 Hopf 纤维的方向，v 代表环面管状的方向
-            glm::vec3 color(cosf(u) * 0.5f + 0.5f, sinf(v) * 0.5f + 0.5f, 1.0f);
-            
-            vertices.emplace_back(pos, color);
-        }
-    }
-    return vertices;
-}
-std::vector<Vertex> generateHopfTorusVertices(uint32_t uSegments, uint32_t vSegments){
-    std::vector<Vertex> vertices;
-    vertices.reserve(uSegments * vSegments);
-    float sqrt_inv = CLIFFORD_R; //保证点在 S^3 上
-    for (uint32_t i = 0; i < uSegments; ++i) {
-        float u = glm::two_pi<float>() * float(i) / float(uSegments);
-        for (uint32_t j = 0; j < vSegments; ++j) {
-            float v = glm::two_pi<float>() * float(j) / float(vSegments);
-            glm::vec4 pos(
-                sqrt_inv * cosf(u),
-                sqrt_inv * sinf(u), sqrt_inv * cosf(v), sqrt_inv * sinf(v)
-            );
-            glm::vec3 color(cosf(u) * 0.5f + 0.5f, sinf(v) * 0.5f + 0.5f, 1.0f);
-#ifdef DEBUG
+            glm::vec3 color(r, 1.0f - r, j / vSegments); 
+#ifndef NDEBUG
             if(pos.w >= -0.1f) color = glm::vec3(0,0,1);
             else color = glm::vec3(1,0,0);
 #endif
             vertices.emplace_back(pos, color);
         }
     }
-
     return vertices;
 }
 std::vector<Vertex> generateHopfTorusVertices(uint32_t uSegments, uint32_t vSegments, int32_t lobeCount, float t) {
@@ -127,6 +69,104 @@ std::vector<Vertex> generateHopfTorusVertices(uint32_t uSegments, uint32_t vSegm
             glm::vec4 pos(cosv * y1, sinv * y1, cosv * y2 - sinv * y3, cosv * y3 + sinv * y2);
             glm::vec3 color(cosf(u) * 0.5f + 0.5f, sinf(v) * 0.5f + 0.5f, glm::mix(1.0f, 0.8f, t));
 
+            vertices.emplace_back(pos, color);
+        }
+    }
+    return vertices;
+}
+std::vector<Vertex> generateHybridHopf(float r, float t, uint32_t uSegments, uint32_t vSegments, uint32_t lobeCount) {
+    std::vector<Vertex> vertices;
+    vertices.reserve(uSegments * vSegments);
+
+    float r_prime = std::sqrt(1.0f - r * r); // r' = sqrt(1 - r^2)
+    float lobeDepth = t * 0.4f; // t 控制变形程度
+
+    for (uint32_t i = 0; i < uSegments; ++i) {
+        float u = glm::two_pi<float>() * float(i) / float(uSegments);
+
+        // --- 第一部分：定义 S² 上的曲线 (来自第二份代码，由 t 控制) ---
+        glm::vec3 p_base(0.0f, cosf(u), sinf(u));
+        
+        // 变形曲线
+        float envelope = cosf(lobeDepth * cosf(lobeCount * u));
+        glm::vec3 p_hopf(sinf(lobeDepth * cosf(lobeCount * u)), cosf(u) * envelope, sinf(u) * envelope);
+        
+        // 防止翻转
+        if (glm::dot(p_base, p_hopf) < 0.0f) p_hopf = -p_hopf;
+
+        // Slerp 插值
+        float angle = acosf(glm::clamp(glm::dot(p_base, p_hopf), -1.0f, 1.0f));
+        glm::vec3 p_s2;
+        if (angle < 0.001f) {
+            p_s2 = p_base;
+        } else {
+            float sinAngle = sinf(angle);
+            p_s2 = (sinf((1.0f - t) * angle) / sinAngle) * p_base + (sinf(t * angle) / sinAngle) * p_hopf;
+        }
+
+        // --- 第二部分：结合 r 参数进行 Hopf 提升 ---
+        // 这里的 p_s2 是 S² 上的点，我们需要把它映射回 S³，并且满足 |z0| = r
+        
+        // 方法：使用 p_s2 作为 Hopf 映射的方向，并用 r 和 r' 作为模长
+        // Hopf 映射公式: pi(q) = (2*q0*q2, 2*q1*q2, q0^2 + q1^2 - q2^2 - q3^2) 的逆过程比较复杂
+        // 简化方案：利用第一份代码的复数对思想，但用 p_s2 生成相位
+        
+        // 将 p_s2 转换为 Hopf 坐标 (z0, z1)
+        // 这里的技巧是：让 z0 的相位是 u，模长是 r；z1 的相位是 v，模长是 r'，但方向受 p_s2 影响
+        // 更直接的方法：使用四元数旋转
+        
+        // 简化实现：直接利用 r 和 p_s2 构造 Hopf 纤维
+        // 假设 p_s2 给出了 Hopf 纤维在 S² 上的投影点，我们需要恢复对应的 S³ 点
+        // 标准构造：对于 S² 上的点 (x,y,z)，对应的 Hopf 纤维之一是：
+        // z0 = sqrt((1+x)/2) * e^(i*u)
+        // z1 = sqrt((1-x)/2) * e^(i*(u+phase)) * (y + i*z) / sqrt(1-x^2) ... (略复杂)
+        
+        // 为了结合 r，我们采用另一种直观方式：
+        // 将 p_s2 视为法向量，构造一个圆截面
+        
+        // 实际上，你的第二份代码已经生成了 Hopf 环面，我们只需要把 r 加进去缩放
+        // 修改第二份代码中的 y(u) 构造部分，使其满足 |z0|=r, |z1|=r'
+        
+        // 这是一个简化的结合版本（保持 Hopf 结构，引入 r 缩放）：
+        float yden = sqrtf(2.0f * (1.0f + p_s2.x));
+        float y1 = (1.0f + p_s2.x) / yden; // 这对应 Re(z0) 的系数
+        float y2 = p_s2.y / yden;         // 这对应 Im(z0) 或 Re(z1) 的系数
+        float y3 = p_s2.z / yden;         // 这对应 Im(z1) 的系数
+
+        // 引入 r 和 r' 进行缩放（关键步骤）
+        // 我们希望 z0 的模是 r，z1 的模是 r'
+        // 原代码默认是 Clifford 环面 (r=1/sqrt(2))，现在我们要缩放它
+        // 缩放因子 alpha 作用于 z0，beta 作用于 z1
+        // 为了不破坏 Hopf 结构，我们缩放 y 向量
+        float scale_z0 = r; 
+        float scale_z1 = r_prime;
+        
+        // 重新分配 y 向量的贡献
+        // y1 主要影响 z0 的实部，y2/y3 主要影响 z1
+        // 这是一个近似的结合，用于展示效果
+        float new_y1 = y1 * scale_z0;
+        float new_y2 = y2 * scale_z1;
+        float new_y3 = y3 * scale_z1;
+
+        for (uint32_t j = 0; j < vSegments; ++j) {
+            float v = glm::two_pi<float>() * float(j) / float(vSegments);
+            float cosv = cosf(v);
+            float sinv = sinf(v);
+
+            // 使用新的 y 向量构造 S³ 点
+            // pos = (Re(z0), Im(z0), Re(z1), Im(z1))
+            // 这里沿用之前的复数乘法结构，但应用了新的缩放
+            glm::vec4 pos(
+                cosv * new_y1 * scale_z0, // 稍微调整以确保模长正确
+                sinv * new_y1 * scale_z0,
+                cosv * new_y2 - sinv * new_y3,
+                cosv * new_y3 + sinv * new_y2
+            );
+            
+            // 归一化以确保严格在 S³ 上 (可选，因为浮点误差)
+            // pos = glm::normalize(pos);
+
+            glm::vec3 color(r, t, float(j) / vSegments); // 颜色反馈 r 和 t
             vertices.emplace_back(pos, color);
         }
     }
@@ -207,29 +247,18 @@ void Hopf::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
 void Hopf::Update(const void *useData){
     const glm::uvec2 segments = glm::uvec2(64);
     const UseData *parameter = (const UseData*)useData;
-    // std::vector<Vertex>vertices;
-    // for (int i = 0; i < segments.y; ++i) {
-    //     // 让 r 从 0.1 (靠近南极) 到 10 (靠近北极)
-    //     // 用指数或线性映射都可以，指数能更集中在极点附近
-    //     float r = powf(10.0f, (float)i / (segments.y - 1) * 2.0f - 1.0f); 
-    //     // 或者用线性: float r = 0.1f + 10.0f * (float)i / (segments.y - 1);
-    //     for (int j = 0; j < segments.x; ++j) {
-    //         float k_offset = glm::two_pi<float>() * (float)j / segments.x;
-    //         auto fiber = generateFullHopfFiber(r, k_offset, segments.y);
-    //         vertices.insert(vertices.end(), fiber.begin(), fiber.end());
-    //     }
-    // }
     std::vector<Vertex> vertices;
     if(parameter->hopf.clifford){
         vertices = generateHopfTorusLayer(CLIFFORD_R, segments.x, segments.y);
+        // vertices = generateHybridHopf(CLIFFORD_R, parameter->hopf.time, segments.x, segments.y, parameter->hopf.lobeCount);
     }
     else{
-        vertices = generateHopfTorusLayer(parameter->hopf.r, segments.x, segments.y);
+        vertices = generateHopfTorusLayer(parameter->hopf.torusAspect, segments.x, segments.y);
+        // vertices = generateHybridHopf(parameter->hopf.torusAspect, parameter->hopf.time, segments.x, segments.y, parameter->hopf.lobeCount);
     }
-    // std::vector<Vertex> vertices = generateHopfTorusVertices(segments.x, segments.y, parameter->hopf.r);
+    // std::vector<Vertex> vertices = generateHopfTorusVertices(segments.x, segments.y, parameter->hopf.torusAspect);
     // std::vector<Vertex> vertices = generateHopfTorusVertices_Complex(segments.x, segments.y);
     std::vector<uint16_t> indices = generateHopfTorusIndices(segments.x, segments.y);
-    // std::vector<Vertex> vertices = generateHopfTorusVertices(segments.x, segments.y, parameter->Hopf.lobeCount, parameter->hopf.r);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

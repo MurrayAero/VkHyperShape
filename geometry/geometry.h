@@ -15,15 +15,17 @@
 #define ALIGN(val, alignment)((val + alignment - 1) & ~(alignment - 1))
 struct UseData{
     struct{
-        float r = 0.1f;
-        bool clifford = false;
+        // float time = 0.0f;
+        bool clifford = true;
+        float torusAspect = 0.0f;
+        // int32_t lobeCount = 3;
     }hopf;
     struct{
         int32_t twistLoops = 1;
     }kleinbottle;
     struct{
-        float radius = .015;
-        float samples = 20;
+        float radius = .01;
+        // float samples = 20;
         //这样写能直接传给imgui
         std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
     }bezier;

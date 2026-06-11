@@ -173,13 +173,14 @@ void Pipeline::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layou
 void Pipeline::Update(const void *useData){
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
+    const float samples = 20;
     const uint32_t segments = 16;
     UseData *parameter = (UseData *)useData;
     generateCurvedCylinder(vertices, indices,
         mglm::vec4(parameter->bezier.point[0][0], parameter->bezier.point[0][1], parameter->bezier.point[0][2], parameter->bezier.point[0][3]),
         mglm::vec4(parameter->bezier.point[1][0], parameter->bezier.point[1][1], parameter->bezier.point[1][2], parameter->bezier.point[1][3]),
         mglm::vec4(parameter->bezier.point[2][0], parameter->bezier.point[2][1], parameter->bezier.point[2][2], parameter->bezier.point[2][3]),
-        mglm::vec4(parameter->bezier.point[3][0], parameter->bezier.point[3][1], parameter->bezier.point[3][2], parameter->bezier.point[3][3]), parameter->bezier.radius, parameter->bezier.samples, segments);
+        mglm::vec4(parameter->bezier.point[3][0], parameter->bezier.point[3][1], parameter->bezier.point[3][2], parameter->bezier.point[3][3]), parameter->bezier.radius, samples, segments);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);
@@ -221,13 +222,14 @@ void Font::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
 void Font::Update(const void *useData){
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
+    const float samples = 20;
     const uint32_t segments = 16;
     UseData parameter = *(UseData *)useData;
     generateCurvedCylinder(vertices, indices,
         glm::vec3(parameter.bezier.point[0][0], parameter.bezier.point[0][1], parameter.bezier.point[0][2]),
         glm::vec3(parameter.bezier.point[1][0], parameter.bezier.point[1][1], parameter.bezier.point[1][2]),
         glm::vec3(parameter.bezier.point[2][0], parameter.bezier.point[2][1], parameter.bezier.point[2][2]),
-        glm::vec3(parameter.bezier.point[3][0], parameter.bezier.point[3][1], parameter.bezier.point[3][2]), parameter.bezier.radius, parameter.bezier.samples, segments);
+        glm::vec3(parameter.bezier.point[3][0], parameter.bezier.point[3][1], parameter.bezier.point[3][2]), parameter.bezier.radius, samples, segments);
     if(!mGeometry.IsVaildIndex() || !mGeometry.IsVaildVertex()){
         mGeometry.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGeometry.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

@@ -196,7 +196,7 @@ namespace vulkan{
     void Image::Copy(vk::CommandBuffer command, Image&src) {
         assert(format == src.format);
         assert(mipLevels == src.mipLevels);
-        assert(size.width == src.size.width && size.height== src.size.height && size.height == src.size.height);
+        assert(size.width == src.size.width && size.height== src.size.height && size.depth == src.size.depth);
 
         const uint32_t layerCount = arrayLayer;
         src.SetLayout(command, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferRead);
@@ -210,7 +210,6 @@ namespace vulkan{
             r.srcSubresource.mipLevel       = i;
             r.srcSubresource.baseArrayLayer = 0;
             r.srcSubresource.layerCount     = layerCount;
-
 
             r.dstSubresource.aspectMask     = aspectMask;
             r.dstSubresource.mipLevel       = i;

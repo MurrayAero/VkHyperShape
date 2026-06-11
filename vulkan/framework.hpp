@@ -31,13 +31,13 @@ namespace vulkan{
 
                 vk::CommandBuffer BeginSingleTimeCommands(vk::Device device, const Pool&pool);
 
-                vk::Sampler CreateTextureSampler(vk::Device device);
+                vk::Sampler CreateTextureSampler(vk::Device device, vk::SamplerAddressMode addressMode = vk::SamplerAddressMode::eRepeat, vk::Filter filter = vk::Filter::eLinear);
 
                 void EndRendering(vk::CommandBuffer command, Image&color);
                 void EndRendering(vk::CommandBuffer command, const std::vector<Image*>&color);
                 void EndSingleTimeCommands(vk::CommandBuffer command, vk::Queue queue, vk::Device device, const Pool&pool);
 
-		void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &textureSampler = {}, bool shaderReadOnlyImageLayout = true);
+		void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler = {}, bool shaderReadOnlyImageLayout = true);
         };
 }
 #endif
