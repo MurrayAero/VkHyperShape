@@ -1,4 +1,5 @@
 #include "pipeline.hpp"
+#include "framework.hpp"
 uint32_t vulkan::pipeline::tools::GetFileSize(FILE *fp){
     uint32_t size = 0;
     if(fp){
@@ -24,13 +25,15 @@ uint32_t vulkan::pipeline::tools::GetFileSize(FILE *fp){
 // }
 bool vulkan::pipeline::tools::WriteFileContent(const std::string &file, const void *data, uint32_t size){
     if(data == nullptr){
-        printf("write file content error:data is nullptr\n");
+		printf("write file content error:data is nullptr\n");
+        spdlog::error("in function {}:write file content error:data is nullptr", __FUNCTION__);
         return false;
     }
     FILE *fp = fopen(file.c_str(), "wb");
     if(!fp){
+		spdlog::error("in function {}:open file error,file name is {}", __FUNCTION__, file.c_str());
         perror("open file error");
-        printf("file name is %s\n", file.c_str());
+        printf("in function %s: file is %s\n", __FUNCTION__, file.c_str());
         return false;
     }
     fwrite(data, size, 1, fp);
@@ -123,6 +126,7 @@ void vulkan::pipeline::Graphics::Create(vk::Device device, vk::PipelineLayout la
     vk::GraphicsPipelineCreateInfo info;
     info = initializers::pipelineCreateInfo(layout, renderPass);
     if(shaderStages.empty()){
+        spdlog::error("in function {}:shaders is empty", __FUNCTION__);
         assert(0 && "shaderStages.empty()");
     }
     if(blendAttachmentState.empty())PushColorBlendAttachmentState();
@@ -169,6 +173,10 @@ void vulkan::pipeline::Graphics::Create(vk::Device device, vk::PipelineLayout la
     if(result.result == vk::Result::eSuccess){
         pipelines = result.value;
     }
+    else{
+        VK_CHECK(result.result);
+        VK_CHECK_LOG(result.result);
+    }
     for (auto&it:shaderStages){
         device.destroyShaderModule(it.module);
     }
@@ -193,6 +201,7 @@ void vulkan::pipeline::Compute::Bind(vk::CommandBuffer command)const noexcept{
 }
 void vulkan::pipeline::Compute::Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache){
     if(shaderStages.empty()){
+        spdlog::error("in function {}:shaders is empty", __FUNCTION__);
         assert(0 && "shaderStages.empty()");
     }
     vk::ComputePipelineCreateInfo info = {};

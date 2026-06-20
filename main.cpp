@@ -10,11 +10,12 @@
 #include "imgui_impl/glfw.h"
 #include "vulkan/renderer.hpp"
 #include "imgui_impl/vulkan.hpp"
-#ifdef DEBUG
+#ifndef NDEBUG
 #include "geometry/test.h"
 #endif
 #include "geometry/grid.h"
 #include "geometry/hopf.h"
+#include "geometry/function.h"
 #include "geometry/cylinder.h"
 #include "geometry/pipeline.h"
 #include "geometry/tesseract.h"
@@ -51,72 +52,48 @@ struct ImGuiInput{
         bool sphere = false;
         bool update = false;
         bool remake = false;
+        bool function = false;
         bool pipeline = false;
         bool cylinder = false;
         bool tesseract = true;
-        bool icositetra = false;
         bool hexadeca = false;
         bool pentatope = false;
         bool spherinder = false;
-        bool kleinBottle = false;
         bool sphereCone = false;
+        bool icositetra = false;
+        bool kleinBottle = false;
         bool hypersphere = false;
         bool realProjectivePlane = false;
-#ifdef DEBUG
-        bool testGeometry = false;
+#ifndef NDEBUG
+        bool test = false;
 #endif
         void UnSelect(){
             memset(this, 0, sizeof(*this));
-        }
-#ifdef DEBUG
-        void SeletctTestGeometry(){
-            UnSelect();
-            update = true;
-            remake = true;
-            testGeometry = true;
-        }
-#endif
-        void SelectTesseract(){
-            UnSelect();
-            update = true;
-            remake = true;
-            tesseract = true;
-        }
-        void SelectSphere(){
-            UnSelect();
-            sphere = true;
-            update = true;
-            remake = true;
-        }
-        void SelectPentatope(){
-            UnSelect();
-            update = true;
-            remake = true;
-            pentatope = true;
-        }
-        void SelectSphereCone(){
-            UnSelect();
-            update = true;
-            remake = true;
-            sphereCone = true;
-        }
-        void SelectIcositetra(){
-            UnSelect();
-            update = true;
-            remake = true;
-            icositetra = true;
-        }
-        void SelectPipeline(){
-            UnSelect();
-            update = true;
-            remake = true;
-            pipeline = true;
         }
         void SelectCylinder(){
             UnSelect();
             update = true;
             remake = true;
             cylinder = true;
+        }
+        void SelectFont(){
+            UnSelect();
+            font = true;
+            update = true;
+            remake = true;
+        }
+        void SelectFunction(){
+            UnSelect();
+            update = true;
+            remake = true;
+            function = true;
+        }
+        void SelectGrid(bool three = false){
+            UnSelect();
+            if(three)grid3d = true;
+            else grid4d = true;
+            update = true;
+            remake = true;
         }
         void SelectHopf(){
             UnSelect();
@@ -130,41 +107,35 @@ struct ImGuiInput{
             remake = true;
             hexadeca = true;
         }
-        void SelectKleinBottle(){
-            UnSelect();
-            update = true;
-            remake = true;
-            kleinBottle = true;
-        }
-        void SelectSpherinder(){
-            UnSelect();
-            update = true;
-            remake = true;
-            spherinder = true;
-        }
-        void SelectGrid3D(){
-            UnSelect();
-            grid3d = true;
-            update = true;
-            remake = true;
-        }
-        void SelectGrid4D(){
-            UnSelect();
-            grid4d = true;
-            update = true;
-            remake = true;
-        }
         void SelectHypersphere(){
             UnSelect();
             update = true;
             remake = true;
             hypersphere = true;
         }
-        void SelectFont(){
+        void SelectIcositetra(){
             UnSelect();
-            font = true;
             update = true;
             remake = true;
+            icositetra = true;
+        }
+        void SelectKleinBottle(){
+            UnSelect();
+            update = true;
+            remake = true;
+            kleinBottle = true;
+        }
+        void SelectPipeline(){
+            UnSelect();
+            update = true;
+            remake = true;
+            pipeline = true;
+        }
+        void SelectPentatope(){
+            UnSelect();
+            update = true;
+            remake = true;
+            pentatope = true;
         }
         void SelectRealProjectionPlane(){
             UnSelect();
@@ -172,11 +143,48 @@ struct ImGuiInput{
             remake = true;
             realProjectivePlane = true;
         }
+        void SelectSphere(){
+            UnSelect();
+            sphere = true;
+            update = true;
+            remake = true;
+        }
+        void SelectSphereCone(){
+            UnSelect();
+            update = true;
+            remake = true;
+            sphereCone = true;
+        }
+        void SelectSpherinder(){
+            UnSelect();
+            update = true;
+            remake = true;
+            spherinder = true;
+        }
+        void SelectTesseract(){
+            UnSelect();
+            update = true;
+            remake = true;
+            tesseract = true;
+        }
+#ifndef NDEBUG
+        void SeletctTest(){
+            UnSelect();
+            update = true;
+            remake = true;
+            test = true;
+        }
+#endif
     }geometry;
     struct{
         bool preset = true;
         bool custom = false;
     }rotateMode;
+    struct{
+        bool stop = true;
+        mglm::Plane plane;
+        bool randomPlane = false;
+    }rotate_animation;
     bool fill = true;
 #ifndef USE_PERSPECTIVE
     float scale = 2.0f;
@@ -184,9 +192,6 @@ struct ImGuiInput{
     UseData parameter;
     bool ortho = false;
     bool mutliView = false;
-    bool stopRotate = true;
-    uint32_t planeIndex = 0;
-    bool randomAngle = false;
     bool doubleRotate = false;
 };
 struct PushConstant{
@@ -223,6 +228,8 @@ std::vector<vk::DescriptorSetLayout>g_CameraSetLayout(2);
 
 Geometry *g_Geometry;
 
+std::shared_ptr<spdlog::logger>g_Logger = spdlog::basic_logger_mt("logger", "logs/global.logs.txt");
+
 // PickingTexture g_PickingTexture;
 
 vulkan::ImGui g_VulkanImGui;
@@ -230,6 +237,20 @@ vulkan::ImGui g_VulkanImGui;
 std::array<ImGuiPlaneInput, 2>g_Plane;
 
 ImGuiInput g_ImGuiInput;
+
+std::string g_FunctionItem[] = {
+    "sin", "cos", "tan", "cot", "sec", "csc",
+    "sinh", "cosh", "tanh", "coth", "sech", "csch",
+    "arcsin", "arccos", "arctan", "arccot", "arcsec", "arccsc",
+    "arsinh", "arcosh", "artanh", "arcoth", "arsech", "arcsch",
+    "exp", "log", "log10", "log2", "sqrt",
+    "z^2", "z^3",
+    // 以下是新增的有趣复变函数
+    "1/z", "1/z^2", "z + 1/z", "z^2 - 1", "e^z", "sin(z)/z",
+    "log(z)", "Gamma", "Riemann Zeta", "J0", "J1", "sin(1/z)",
+    "exp(1/z)", "z^(1/2)", "z^(1/3)", "z^i", "z^z", "sinh(1/z)",
+    "tan(z/2)", "Weierstrass P", "Airy Ai", "Dawson", "Fresnel C"
+};
 
 #ifdef ENABE_DEPTH_TEST
 DepthTest g_DepthTest;
@@ -313,8 +334,8 @@ void UpdateUniform(const vulkan::Device&device){
     }
 }
 void ShowGeometry(){
-    const std::array fdCurrentItems = { "超立方体", "正五胞体", "正十六胞体", "正二十四胞体", "四维网格", "球柱体", "球锥体", "超球", "hopf环面", "克莱因瓶", "实射影平面", "贝塞尔管道", "四维字",
-#ifdef DEBUG
+    const std::array fdCurrentItems = { "超立方体", "正五胞体", "正十六胞体", "正二十四胞体", "四维网格", "球柱体", "球锥体", "超球", "hopf环面", "克莱因瓶", "实射影平面", "贝塞尔管道", "四维字", "复变函数",
+#ifndef NDEBUG
         "图元测试"
 #endif
     };
@@ -358,14 +379,18 @@ void ShowGeometry(){
                     g_ImGuiInput.geometry.SelectPipeline();
                 }
                 else if(fdGeometry == "四维网格"){
-                    g_ImGuiInput.geometry.SelectGrid4D();
+                    g_ImGuiInput.geometry.SelectGrid();
                 }
                 else if(fdGeometry == "实射影平面"){
                     g_ImGuiInput.geometry.SelectRealProjectionPlane();
                 }
-#ifdef DEBUG
+                else if(fdGeometry == "复变函数"){
+                    g_ImGuiInput.ortho = true;
+                    g_ImGuiInput.geometry.SelectFunction();
+                }
+#ifndef NDEBUG
                 else if(fdGeometry == "图元测试"){
-                    g_ImGuiInput.geometry.SeletctTestGeometry();
+                    g_ImGuiInput.geometry.SeletctTest();
                 }
 #endif
                 break;
@@ -387,7 +412,7 @@ void ShowGeometry(){
                     g_ImGuiInput.geometry.SelectCylinder();
                 }
                 else if(tdGeometry == "三维网格"){
-                    g_ImGuiInput.geometry.SelectGrid3D();
+                    g_ImGuiInput.geometry.SelectGrid(true);
                 }
                 break;
             }
@@ -411,6 +436,7 @@ void ShowPlaneCombo(const char *lable){
     SetPlane(plane);
 }
 void ShowRotate(){
+    ImGui::BeginDisabled(!g_ImGuiInput.rotate_animation.stop);
     if(g_ImGuiInput.rotateMode.preset){
         ShowPlaneCombo("平面一");
         ImGui::SameLine();
@@ -418,6 +444,17 @@ void ShowRotate(){
     }
     else{
         static float planeVec[][4] = { {g_Plane[0].plane.u.x, g_Plane[0].plane.u.y, g_Plane[0].plane.u.z, g_Plane[0].plane.u.w}, {g_Plane[0].plane.v.x, g_Plane[0].plane.v.y, g_Plane[0].plane.v.z, g_Plane[0].plane.v.w} };
+        if(!g_ImGuiInput.rotate_animation.stop){
+            planeVec[0][0] = g_Plane[0].plane.u.x;
+            planeVec[0][1] = g_Plane[0].plane.u.y;
+            planeVec[0][2] = g_Plane[0].plane.u.z;
+            planeVec[0][3] = g_Plane[0].plane.u.w;
+
+            planeVec[1][0] = g_Plane[1].plane.v.x;
+            planeVec[1][1] = g_Plane[1].plane.v.y;
+            planeVec[1][2] = g_Plane[1].plane.v.z;
+            planeVec[1][3] = g_Plane[1].plane.v.w;            
+        }
         ImGui::Text("平面一");
         if(ImGui::InputFloat4("u", planeVec[0])){
             g_Plane[0].plane.u = mglm::vec4(planeVec[0][0], planeVec[0][1], planeVec[0][2], planeVec[0][3]);
@@ -447,8 +484,9 @@ void ShowRotate(){
             g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
         }
     }
-    ImGui::BeginDisabled(!g_ImGuiInput.stopRotate);
+    ImGui::EndDisabled();
     ImGui::Checkbox("双旋转", &g_ImGuiInput.doubleRotate);
+    ImGui::BeginDisabled(!g_ImGuiInput.rotate_animation.stop);
     if(ImGui::SliderFloat("平面一角度", &g_Plane[0].angle, 0, 360)){
         if(g_ImGuiInput.doubleRotate){
             g_Plane[1].angle = g_Plane[0].angle;
@@ -463,31 +501,341 @@ void ShowRotate(){
     }
     ImGui::EndDisabled();
 }
+//因为我们只启动一次线程, 直到线程退出才会启动新线程, 所以需要全局变量
 void RotateAnimation(){
-    const std::array plane = { mglm::planes::XY, mglm::planes::XZ, mglm::planes::YZ, mglm::planes::XW, mglm::planes::YW, mglm::planes::ZW };
     float angle = 0;
-    while (!g_ImGuiInput.stopRotate){
-        if(g_ImGuiInput.randomAngle){
-            g_Plane[0].angle = rand() % 360;
-            if(g_ImGuiInput.doubleRotate)g_Plane[1].angle = rand() % 360;
+    mglm::Plane plane;
+    constexpr auto targetFrameDuration = std::chrono::milliseconds(25);
+    while (!g_ImGuiInput.rotate_animation.stop){
+        auto frameStart = std::chrono::steady_clock::now();
+        g_Plane[0].angle = angle;
+        if(g_ImGuiInput.doubleRotate)g_Plane[1].angle = angle;
+        if(g_ImGuiInput.rotate_animation.randomPlane){
+            g_ImGuiInput.rotate_animation.randomPlane = false;
+            do{
+                plane.u = mglm::vec4(rand() % 2, rand() % 2, rand() % 2, rand() % 2);                
+            } while (mglm::length(plane.u) < 1e-6f);
+            plane.v = mglm::getOrthogonal(plane.u);
+        }
+        if(g_ImGuiInput.rotate_animation.plane.u == mglm::vec4(0) && g_ImGuiInput.rotate_animation.plane.v == mglm::vec4(0)){
+            g_Plane[0].plane = plane;
+            g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
         }
         else{
-            g_Plane[0].angle = angle;
-            if(g_ImGuiInput.doubleRotate)g_Plane[1].angle = angle;
-            angle = ((uint32_t)angle + 1) % 360;
+            g_Plane[0].plane = g_ImGuiInput.rotate_animation.plane;
+            g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
         }
-        if(g_ImGuiInput.planeIndex > 5){
-            g_Plane[0].plane.u = mglm::vec4((rand() % 101) * .001f, (rand() % 101) * .001f, (rand() % 101) * .001f, (rand() % 101) * .001f);
-            g_Plane[0].plane.u = mglm::normalize(g_Plane[0].plane.u);
-        }
-        else{
-            g_Plane[0].plane = plane[g_ImGuiInput.planeIndex];
-        }
-        g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
+        angle = ((uint32_t)angle + 1) % 360;
         UpdateUniform(g_VulkanDevice);
-        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        auto elapsed = std::chrono::steady_clock::now() - frameStart;
+        auto remaining = targetFrameDuration - elapsed;
+        if (remaining > std::chrono::milliseconds(0)) {
+            std::this_thread::sleep_for(remaining);
+        }
     }
 }
+std::function<std::complex<float>(const std::complex<float>&)>GetFunction(const std::string& function){
+    constexpr std::complex<float> I(0.0f, 1.0f);
+    
+    // 三角函数
+    if(function == "sin"){
+        return [](const std::complex<float>& z){ return std::sin(z); };
+    }
+    else if(function == "cos"){
+        return [](const std::complex<float>& z){ return std::cos(z); };
+    }
+    else if(function == "tan"){
+        return [](const std::complex<float>& z){ return std::tan(z); };
+    }
+    else if(function == "cot"){
+        return [](const std::complex<float>& z){ return 1.0f / std::tan(z); };
+    }
+    else if(function == "sec"){
+        return [](const std::complex<float>& z){ return 1.0f / std::cos(z); };
+    }
+    else if(function == "csc"){
+        return [](const std::complex<float>& z){ return 1.0f / std::sin(z); };
+    }
+    
+    // 双曲函数
+    else if(function == "sinh"){
+        return [](const std::complex<float>& z){ return std::sinh(z); };
+    }
+    else if(function == "cosh"){
+        return [](const std::complex<float>& z){ return std::cosh(z); };
+    }
+    else if(function == "tanh"){
+        return [](const std::complex<float>& z){ return std::tanh(z); };
+    }
+    else if(function == "coth"){
+        return [](const std::complex<float>& z){ return 1.0f / std::tanh(z); };
+    }
+    else if(function == "sech"){
+        return [](const std::complex<float>& z){ return 1.0f / std::cosh(z); };
+    }
+    else if(function == "csch"){
+        return [](const std::complex<float>& z){ return 1.0f / std::sinh(z); };
+    }
+    
+    // 反三角函数
+    else if(function == "arcsin"){
+        return [I](const std::complex<float>& z){ return -I * std::log(I*z + std::sqrt(1.0f - z*z)); };
+    }
+    else if(function == "arccos"){
+        return [I](const std::complex<float>& z){ return -I * std::log(z + I*std::sqrt(1.0f - z*z)); };
+    }
+    else if(function == "arctan"){
+        return [I](const std::complex<float>& z){ return 0.5f*I * std::log((I + z)/(I - z)); };
+    }
+    else if(function == "arccot"){
+        return [I](const std::complex<float>& z){ return 0.5f*I * std::log((z - I)/(z + I)); };
+    }
+    else if(function == "arcsec"){
+        return [I](const std::complex<float>& z){ return -I * std::log(1.0f/z + I*std::sqrt(1.0f - 1.0f/(z*z))); };
+    }
+    else if(function == "arccsc"){
+        return [I](const std::complex<float>& z){ return -I * std::log(I/z + std::sqrt(1.0f - 1.0f/(z*z))); };
+    }
+    
+    // 反双曲函数
+    else if(function == "arsinh"){
+        return [](const std::complex<float>& z){ return std::asinh(z); };
+    }
+    else if(function == "arcosh"){
+        return [](const std::complex<float>& z){ return std::acosh(z); };
+    }
+    else if(function == "artanh"){
+        return [](const std::complex<float>& z){ return std::atanh(z); };
+    }
+    else if(function == "arcoth"){
+        return [](const std::complex<float>& z){ return 0.5f * std::log((z + 1.0f)/(z - 1.0f)); };
+    }
+    else if(function == "arsech"){
+        return [](const std::complex<float>& z){ return std::log((1.0f + std::sqrt(1.0f - z*z))/z); };
+    }
+    else if(function == "arcsch"){
+        return [](const std::complex<float>& z){ return std::log((1.0f + std::sqrt(1.0f + z*z))/z); };
+    }
+    
+    // 基本函数
+    else if(function == "exp"){
+        return [](const std::complex<float>& z){ return std::exp(z); };
+    }
+    else if(function == "log"){
+        return [](const std::complex<float>& z){ return std::log(z); };
+    }
+    else if(function == "log10"){
+        return [](const std::complex<float>& z){ return std::log10(z); };
+    }
+    else if(function == "log2"){
+        return [](const std::complex<float>& z){ return std::log(z) / std::log(2.0f); };
+    }
+    else if(function == "sqrt"){
+        return [](const std::complex<float>& z){ return std::sqrt(z); };
+    }
+    
+    // 幂函数
+    else if(function == "z^2"){
+        return [](const std::complex<float>& z){ return z*z; };
+    }
+    else if(function == "z^3"){
+        return [](const std::complex<float>& z){ return z*z*z; };
+    }
+    
+    // 以下是新增的有趣复变函数
+    else if(function == "1/z"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-10f) return std::complex<float>(1e10f, 0.0f); // 处理奇点
+            return 1.0f/z; 
+        };
+    }
+    else if(function == "1/z^2"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-10f) return std::complex<float>(1e10f, 0.0f);
+            return 1.0f/(z*z); 
+        };
+    }
+    else if(function == "z + 1/z"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-10f) return std::complex<float>(1e10f, 0.0f);
+            return z + 1.0f/z; 
+        };
+    }
+    else if(function == "z^2 - 1"){
+        return [](const std::complex<float>& z){ return z*z - 1.0f; };
+    }
+    else if(function == "e^z"){
+        return [](const std::complex<float>& z){ return std::exp(z); };
+    }
+    else if(function == "sin(z)/z"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-6f) return std::complex<float>(1.0f, 0.0f); // sinc(0) = 1
+            return std::sin(z)/z; 
+        };
+    }
+    else if(function == "log(z)"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-10f) return std::complex<float>(-1e10f, 0.0f);
+            return std::log(z); 
+        };
+    }
+    else if(function == "Gamma"){
+        // Lanczos 近似，适用于实部和虚部较小的复数
+        return [](const std::complex<float>& z){
+            if(z.real() <= 0.0f && std::abs(std::fmod(z.real(), 1.0f)) < 1e-6f) 
+                return std::complex<float>(1e10f, 0.0f);
+            
+            // Lanczos 常数 g = 6.0
+            static constexpr float g = 6.0f;
+            
+            // Lanczos 系数，来自 Godfrey 的 "An Atlas of Functions"
+            static constexpr float p[7] = {
+                1.000000000190015f,
+                76.18009172947146f,
+                -86.50532032941677f,
+                24.01409824083091f,
+                -1.231739572450155f,
+                0.1208650973866179e-2f,
+                -0.5395239384953e-5f
+            };
+            
+            std::complex<float> x = z;
+            std::complex<float> tmp = x + g - 0.5f;  // g + 0.5
+            tmp = (x - 0.5f) * std::log(tmp) - tmp;
+            
+            std::complex<float> ser = p[0];
+            for(int i = 1; i < 7; ++i) {
+                ser += p[i] / (x + static_cast<float>(i));
+            }
+            
+            return std::exp(tmp) * glm::root_pi<float>() * ser / x;
+        };
+    }
+    else if(function == "Riemann Zeta"){
+        // 简化的 Riemann Zeta 函数近似(仅用于可视化，精度有限)
+        return [](const std::complex<float>& z){
+            int n = 30;
+            std::complex<float> sum = 0.0f;
+            for(int k=1; k<=n; k++){
+                sum += 1.0f / std::pow(std::complex<float>(float(k), 0.0f), z);
+            }
+            return sum;
+        };
+    }
+    else if(function == "J0"){
+        // 零阶贝塞尔函数近似
+        return [](const std::complex<float>& z){
+            std::complex<float> sum = 0.0f;
+            std::complex<float> term = 1.0f;
+            for(int n=1; n<=20; n++){
+                term *= -z*z/(4.0f*n*n);
+                sum += term;
+            }
+            return 1.0f + sum;
+        };
+    }
+    else if(function == "J1"){
+        // 一阶贝塞尔函数近似
+        return [](const std::complex<float>& z){
+            if(std::abs(z) < 1e-6f) return std::complex<float>(0.0f, 0.0f);
+            std::complex<float> sum = 0.0f;
+            std::complex<float> term = z/2.0f;
+            for(int n=1; n<=20; n++){
+                term *= -z*z/(4.0f*n*(n+1));
+                sum += term;
+            }
+            return z/2.0f + sum;
+        };
+    }
+    else if(function == "sin(1/z)"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-10f) return std::complex<float>(0.0f, 0.0f);
+            return std::sin(1.0f/z); 
+        };
+    }
+    else if(function == "exp(1/z)"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-10f) return std::complex<float>(0.0f, 0.0f);
+            return std::exp(1.0f/z); 
+        };
+    }
+    else if(function == "z^(1/2)"){
+        return [](const std::complex<float>& z){ return std::sqrt(z); };
+    }
+    else if(function == "z^(1/3)"){
+        return [](const std::complex<float>& z){ return std::pow(z, 1.0f/3.0f); };
+    }
+    else if(function == "z^i"){
+        return [I](const std::complex<float>& z){ return std::pow(z, I); };
+    }
+    else if(function == "z^z"){
+        return [](const std::complex<float>& z){ return std::pow(z, z); };
+    }
+    else if(function == "sinh(1/z)"){
+        return [](const std::complex<float>& z){ 
+            if(std::abs(z) < 1e-10f) return std::complex<float>(0.0f, 0.0f);
+            return std::sinh(1.0f/z); 
+        };
+    }
+    else if(function == "tan(z/2)"){
+        return [](const std::complex<float>& z){ return std::tan(z/2.0f); };
+    }
+    else if(function == "Weierstrass P"){
+        // 简化的 Weierstrass ℘ 函数近似
+        return [](const std::complex<float>& z){
+            if(std::abs(z) < 1e-6f) return std::complex<float>(1e10f, 0.0f);
+            std::complex<float> sum = 1.0f/(z*z);
+            for(int n=-3; n<=3; n++){
+                for(int m=-3; m<=3; m++){
+                    if(n==0 && m==0) continue;
+                    std::complex<float> w = std::complex<float>(2.0f*n, 2.0f*m);
+                    sum += 1.0f/((z-w)*(z-w)) - 1.0f/(w*w);
+                }
+            }
+            return sum;
+        };
+    }
+    else if(function == "Airy Ai"){
+        // Airy Ai 函数近似
+        return [](const std::complex<float>& z){
+            std::complex<float> term = 1.0f;
+            std::complex<float> sum = term;
+            for(int n=1; n<=20; n++){
+                term *= z*z*z/(3.0f*n*(3.0f*n-1.0f));
+                sum += term;
+            }
+            return 0.355028053887817f * sum; // 1/(3^(2/3)*Γ(2/3))
+        };
+    }
+    else if(function == "Dawson"){
+        // Dawson 积分函数近似
+        return [](const std::complex<float>& z){
+            if(std::abs(z) < 1e-6f) return z;
+            std::complex<float> sum = 0.0f;
+            std::complex<float> term = 1.0f;
+            for(int n=0; n<20; n++){
+                term *= -2.0f*z*z/(2.0f*n+1.0f);
+                sum += term;
+            }
+            return std::exp(-z*z) * sum;
+        };
+    }
+    else if(function == "Fresnel C"){
+        // Fresnel 余弦积分近似
+        return [](const std::complex<float>& z){
+            std::complex<float> sum = 0.0f;
+            std::complex<float> term = z;
+            for(int n=0; n<20; n++){
+                term *= -glm::pi<float>() *z*z*z*z/(4.0f*(2.0f*n+1.0f)*(n+1.0f)*(2.0f*n+3.0f));
+                sum += term;
+            }
+            return sum;
+        };
+    }
+    
+    return [](const std::complex<float>& z){ return z; };
+}
+
 void UpdateImGui(vk::CommandBuffer command){
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -506,61 +854,69 @@ void UpdateImGui(vk::CommandBuffer command){
                 g_ImGuiInput.rotateMode.custom = false;
             }
             if(ImGui::BeginMenu("动画")){
-                ImGui::MenuItem("停止", nullptr, &g_ImGuiInput.stopRotate);
-                ImGui::MenuItem("双旋转", nullptr, &g_ImGuiInput.doubleRotate);
-                ImGui::MenuItem("随机角度", nullptr, &g_ImGuiInput.randomAngle);
-                if(ImGui::MenuItem("XY")){
-                    g_ImGuiInput.planeIndex = 0;
-                    if(g_ImGuiInput.stopRotate){
-                        g_ImGuiInput.stopRotate = false;
+                if(ImGui::MenuItem("停止", nullptr, &g_ImGuiInput.rotate_animation.stop)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::Plane();
+                }
+                if(ImGui::MenuItem("XY", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XY)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::XY;
+                    g_ImGuiInput.rotateMode.preset = true;
+                    if(g_ImGuiInput.rotate_animation.stop){
+                        g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("XZ")){
-                    g_ImGuiInput.planeIndex = 1;
-                    if(g_ImGuiInput.stopRotate){
-                        g_ImGuiInput.stopRotate = false;
+                if(ImGui::MenuItem("XZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XZ)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::XZ;
+                    g_ImGuiInput.rotateMode.preset = true;
+                    if(g_ImGuiInput.rotate_animation.stop){
+                        g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("YZ")){
-                    g_ImGuiInput.planeIndex = 2;
-                    if(g_ImGuiInput.stopRotate){
-                        g_ImGuiInput.stopRotate = false;
+                if(ImGui::MenuItem("YZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::YZ)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::YZ;
+                    g_ImGuiInput.rotateMode.preset = true;
+                    if(g_ImGuiInput.rotate_animation.stop){
+                        g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("XW")){
-                    g_ImGuiInput.planeIndex = 3;
-                    if(g_ImGuiInput.stopRotate){
-                        g_ImGuiInput.stopRotate = false;
+                if(ImGui::MenuItem("XW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XW)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::XW;
+                    g_ImGuiInput.rotateMode.preset = true;
+                    if(g_ImGuiInput.rotate_animation.stop){
+                        g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("YW")){
-                    g_ImGuiInput.planeIndex = 4;
-                    if(g_ImGuiInput.stopRotate){
-                        g_ImGuiInput.stopRotate = false;
+                if(ImGui::MenuItem("YW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::YW)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::YW;
+                    g_ImGuiInput.rotateMode.preset = false;
+                    if(g_ImGuiInput.rotate_animation.stop){
+                        g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("ZW")){
-                    g_ImGuiInput.planeIndex = 5;
-                    if(g_ImGuiInput.stopRotate){
-                        g_ImGuiInput.stopRotate = false;
+                if(ImGui::MenuItem("ZW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::ZW)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::ZW;
+                    g_ImGuiInput.rotateMode.preset = true;
+                    if(g_ImGuiInput.rotate_animation.stop){
+                        g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
                         thread.detach();
                     }
                 }
                 if(ImGui::MenuItem("随机")){
-                    g_ImGuiInput.planeIndex = 6;
-                    if(g_ImGuiInput.stopRotate){
-                        g_ImGuiInput.stopRotate = false;
+                    g_ImGuiInput.rotateMode.preset = false;
+                    g_ImGuiInput.rotate_animation.randomPlane = true;
+                    g_ImGuiInput.rotate_animation.plane = mglm::Plane();
+                    if(g_ImGuiInput.rotate_animation.stop){
+                        g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
                         thread.detach();
                     }
@@ -608,6 +964,24 @@ void UpdateImGui(vk::CommandBuffer command){
                 g_ImGuiInput.geometry.update = true;
             }
         }
+        if(g_ImGuiInput.geometry.function){
+            static std::string currentFunctionItem = g_FunctionItem[2];
+            if(ImGui::SliderFloat("range", &g_ImGuiInput.parameter.function.range, 1, 4)){
+                g_ImGuiInput.geometry.update = true;
+            }
+            if(ImGui::BeginCombo("复变函数", currentFunctionItem.c_str())){
+                for (uint32_t i = 0; i < sizeof(g_FunctionItem) / sizeof(std::string); ++i){
+                    bool is_selected = currentFunctionItem == g_FunctionItem[i];
+                    if (ImGui::Selectable(g_FunctionItem[i].c_str(), is_selected)){
+                        g_ImGuiInput.geometry.update = true;
+                        currentFunctionItem = g_FunctionItem[i];
+                        g_ImGuiInput.parameter.function.fun = GetFunction(currentFunctionItem);
+                        break;
+                    }
+                }
+                ImGui::EndCombo();
+            } 
+        }
         if(g_ImGuiInput.geometry.hopf){
             if(ImGui::Checkbox("clifford环面", &g_ImGuiInput.parameter.hopf.clifford)){
                 g_ImGuiInput.parameter.hopf.torusAspect = CLIFFORD_R;
@@ -629,9 +1003,6 @@ void UpdateImGui(vk::CommandBuffer command){
             if(ImGui::InputFloat("半径", &g_ImGuiInput.parameter.bezier.radius)){
                 g_Geometry->Update(&g_ImGuiInput.parameter);
             }
-            // if(ImGui::InputFloat("采样率", &g_ImGuiInput.parameter.bezier.samples)){
-            //     g_Geometry->Update(&g_ImGuiInput.parameter);
-            // }
             for (size_t i = 0; i < 4; i++){
                 char label[0xff];
                 sprintf(label, "点%d", i);
@@ -672,18 +1043,16 @@ void updateViewport(vk::CommandBuffer command, uint32_t windowWidth, uint32_t wi
     command.setScissor(0, vulkan::pipeline::initializers::scissor(extent.width, extent.height, offset.x, offset.y));
     command.setViewport(0, vulkan::pipeline::initializers::viewport(extent.width, extent.height, offset.x, offset.y));
 }
-// Geometry *g_Hs;
 void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t count){
     PushConstant pc;
 #ifdef USE_PERSPECTIVE
     pc.model = glm::mat4(1.0f);
-    pc.projection = glm::perspective(glm::radians(45.0f), .1f, 0.1f, 100.0f);
+    pc.projection = glm::perspective(glm::radians(45.0f), 1.0f, .1f, 100.0f);
     pc.projection[1][1] *= -1;
 #else
-    float aspect = (float)g_WindowWidth / (float)g_WindowHeight;
     pc.model = glm::scale(glm::mat4(1.0f), glm::vec3(g_ImGuiInput.scale));
-    float distance = mglm::distance(g_CameraPos[0], mglm::vec4(0));
-    pc.projection = glm::ortho(-distance * aspect, distance * aspect, -distance, distance, -distance * 10, distance * 10);
+    const float distance = mglm::distance(g_CameraPos[0], mglm::vec4(0));
+    pc.projection = glm::ortho(-distance, distance, -distance, distance, -distance * 10, distance * 10);
 #endif
     if(g_ImGuiInput.fill){
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline[0]);
@@ -699,11 +1068,7 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
     uint32_t dynamicOffsets = 0;
     if(g_ImGuiInput.mutliView){
         vk::Extent2D extent;
-#ifdef USE_PERSPECTIVE
-        claceViewport(g_WindowWidth, g_WindowHeight, extent);
-#else
-        extent = vk::Extent2D(g_WindowWidth, g_WindowHeight);
-#endif
+        calculateViewport(g_WindowWidth, g_WindowHeight, extent);
         for(uint32_t i = 0; i < 4; ++i){
             dynamicOffsets = i * g_MvpUbo.GetSize();
             const uint32_t width = extent.width / 2;
@@ -723,23 +1088,12 @@ void Draw(vk::CommandBuffer command, const vk::Pipeline *pipeline, uint32_t coun
         }
     }
     else{
-        // if(!g_Hs){
-        //     g_Hs = new Hypersphere;
-        //     g_Hs->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
-        //     g_Hs->Update();
-        // }
-#ifdef USE_PERSPECTIVE
         updateViewport(command, g_WindowWidth, g_WindowHeight);
-#endif
         command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline.layout, 1, g_Set[1], dynamicOffsets);
-        command.setScissor(0, vulkan::pipeline::initializers::scissor(g_WindowWidth, g_WindowHeight));
-        command.setViewport(0, vulkan::pipeline::initializers::viewport(g_WindowWidth, g_WindowHeight));
         if(g_ImGuiInput.fill){
-            // g_Hs->Draw(command, g_Pipeline.layout);
             g_Geometry->Draw(command, g_Pipeline.layout);
         }
         else{
-            // g_Hs->DrawWireframe(command, g_Pipeline.layout);
             g_Geometry->DrawWireframe(command, g_Pipeline.layout);
         }
     }
@@ -791,9 +1145,11 @@ void RecordCommand(vk::CommandBuffer command, vk::Framebuffer frame, vk::RenderP
 void keybutton(GLFWwindow *window, int key, int scancode, int action, int mods){
 
 }
-void mousescroll(GLFWwindow *window, double xoffset, double yoffset){;
+void mousescroll(GLFWwindow *window, double xoffset, double yoffset){
+#ifdef USE_PERSPECTIVE
     g_Camera.ProcessMouseScroll(yoffset);
     g_Camera.UpdateUniform(g_VulkanDevice);
+#endif
 }
 glm::vec2 g_MousePos;
 void mousecursor(GLFWwindow *window, double xpos, double ypos){
@@ -848,6 +1204,7 @@ void CreateGraphicsPipeline(vk::Device device, VkPipelineLayout layout){
     vk::PipelineColorBlendStateCreateInfo colorBlendState = vulkan::pipeline::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
     vk::PipelineMultisampleStateCreateInfo multisampleState = vulkan::pipeline::initializers::pipelineMultisampleStateCreateInfo(vk::SampleCountFlagBits::e1);
     vk::PipelineDepthStencilStateCreateInfo depthStencilState = vulkan::pipeline::initializers::pipelineDepthStencilStateCreateInfo(vk::True, vk::True, vk::CompareOp::eLessOrEqual);
+    // vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = vulkan::pipeline::initializers::pipelineInputAssemblyStateCreateInfo(vk::PrimitiveTopology::ePointList, vk::False);
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = vulkan::pipeline::initializers::pipelineInputAssemblyStateCreateInfo(vk::PrimitiveTopology::eTriangleList, vk::False);
     vk::PipelineRasterizationStateCreateInfo rasterizationState = vulkan::pipeline::initializers::pipelineRasterizationStateCreateInfo(vk::PolygonMode::eFill, vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise);
     std::array<vk::DynamicState, 2> dynamicStateEnables = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -970,6 +1327,7 @@ void Setup(GLFWwindow *window){
     g_Plane[1].plane = mglm::planes::ZW;
 
     g_ImGuiInput.parameter.hopf.torusAspect = CLIFFORD_R;
+    g_ImGuiInput.parameter.function.fun = GetFunction("tan");
 
     g_Geometry = new Tesseract;
     g_Geometry->Setup(g_VulkanDevice, g_VulkanQueue.graphics, g_VulkanPool);
@@ -1085,8 +1443,11 @@ void display(GLFWwindow* window){
         else if(g_ImGuiInput.geometry.realProjectivePlane){
             g_Geometry = new ProjectivePlane;
         }
-#ifdef DEBUG
-        else if(g_ImGuiInput.geometry.testGeometry){
+        else if(g_ImGuiInput.geometry.function){
+            g_Geometry = new Function;
+        }
+#ifndef NDEBUG
+        else if(g_ImGuiInput.geometry.test){
             g_Geometry = new GeometryTest;
         }
 #endif
@@ -1109,11 +1470,6 @@ bool SelectPhysicalDevice(vk::PhysicalDevice physicalDevice){
     return physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eIntegratedGpu;
 }
 void SetupVulkan(GLFWwindow *window){
-    // if (volkInitialize() != VK_SUCCESS){
-    //     std::cerr << "Cannot load Vulkan loader.\n";
-    //     return;
-    // }
-    // VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
     uint32_t count;
     const char** instanceExtension = glfwGetRequiredInstanceExtensions(&count);
     std::vector<const char*> extensions(instanceExtension, instanceExtension + count);
@@ -1121,8 +1477,6 @@ void SetupVulkan(GLFWwindow *window){
     g_VulkanDevice.EnableValidation();
 #endif
     g_VulkanDevice.CreateInstance(extensions);
-    // VULKAN_HPP_DEFAULT_DISPATCHER.init(g_VulkanDevice.GetInstance());
-    // volkLoadInstance(g_VulkanDevice.GetInstance());
     g_VulkanDevice.SelectPhysicalDevice(SelectPhysicalDevice);
     g_VulkanDevice.EnableDynamicRendering();
 #ifdef ENABLE_DEPTH_TEST
@@ -1131,7 +1485,6 @@ void SetupVulkan(GLFWwindow *window){
     VkSurfaceKHR surface;
     glfwCreateWindowSurface(g_VulkanDevice.GetInstance(), window, nullptr, &surface);
     g_VulkanRenderer.SetSurface(surface);
-    //版本较低时, 需要开启设备扩展:VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
     g_VulkanDevice.CreateDevice(g_VulkanRenderer.GetSurface());
     g_VulkanDevice.CreateAllocator();
     g_VulkanPool.CreatePool(g_VulkanDevice, 5, vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
@@ -1172,6 +1525,9 @@ glm::uvec2 GetScreenSize(){
 }
 #ifdef _WIN32
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
+    g_Logger->flush_on(spdlog::level::err);
+    spdlog::set_level(spdlog::level::err);
+    spdlog::set_default_logger(g_Logger);
     if (GLFW_FALSE == glfwInit()) {
         printf("initialize glfw error");
         return 1;
@@ -1216,6 +1572,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 }
 #else
 int main(){
+    g_Logger->flush_on(spdlog::level::err);
+    spdlog::set_level(spdlog::level::debug);
+    spdlog::set_default_logger(g_Logger);
     if (GLFW_FALSE == glfwInit()) {
         printf("initialize glfw error");
         return 1;
@@ -1233,7 +1592,7 @@ int main(){
     SetupVulkan(window);
     Setup(window);
 
-    const double targetFrameTime = 1.0 / 60.0; // 目标帧时间（例如60 FPS）
+    const double targetFrameTime = 1.0 / 60.0; // 目标帧时间(例如60 FPS)
     auto previousTime = std::chrono::high_resolution_clock::now();
     while (!glfwWindowShouldClose(window)) {
         auto currentTime = std::chrono::high_resolution_clock::now();
@@ -1255,6 +1614,7 @@ int main(){
     g_VulkanDevice.waitIdle();
     Cleanup(g_VulkanDevice);
     CleanupVulkan();
+    spdlog::shutdown();
     return 0;
 }
 #endif

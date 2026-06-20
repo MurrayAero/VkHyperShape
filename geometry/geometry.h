@@ -1,6 +1,7 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 #include <array>
+#include <complex>
 
 #include "../mglm.hpp"
 #include "../transform.hpp"
@@ -15,6 +16,17 @@
 #define ALIGN(val, alignment)((val + alignment - 1) & ~(alignment - 1))
 struct UseData{
     struct{
+        float radius = .01;
+        // float samples = 20;
+        //这样写能直接传给imgui
+        std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
+    }bezier;
+    struct{
+        float range = 1.0f;
+        // std::complex<float>(*fun)(const std::complex<float>&) = nullptr;
+        std::function<std::complex<float>(const std::complex<float> &)>fun;
+    }function;
+    struct{
         // float time = 0.0f;
         bool clifford = true;
         float torusAspect = 0.0f;
@@ -23,12 +35,6 @@ struct UseData{
     struct{
         int32_t twistLoops = 1;
     }kleinbottle;
-    struct{
-        float radius = .01;
-        // float samples = 20;
-        //这样写能直接传给imgui
-        std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
-    }bezier;
 };
 struct Vertex {
     glm::vec4 pos;

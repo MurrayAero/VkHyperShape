@@ -71,4 +71,5 @@ target_link_libraries(demo
     imgui_impl_cpp
     imgui_cpp
     vulkan_cpp
+    geometry_cpp
 )

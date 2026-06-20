@@ -1,22 +1,5 @@
 #include "grid.h"
-void Grid3D::Cleanup(){
-    mGrid.Destroy(*gpu.device);
-}
-
-void Grid3D::Draw(vk::CommandBuffer command, vk::PipelineLayout layout){
-    mGrid.Bind(command);
-    mGrid.Draw(command);
-}
-
-void Grid3D::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
-    mGrid.Bind(command);
-    mGrid.Draw(command);
-}
-
-void Grid3D::Update(const void *useData){
-    std::vector<Vertex> vertices;
-    std::vector<uint16_t> indices;
-
+void generate3dGrid(std::vector<Vertex>&vertices, std::vector<uint16_t>&indices){
     std::array<glm::vec4, 8> pos = {
         glm::vec4(-1.0f, -1.0f, -1.0f, 0.0f),  // 0: -x, -y, -z
         glm::vec4(-1.0f, -1.0f,  1.0f, 0.0f),  // 1: -x, -y, +z
@@ -95,34 +78,8 @@ void Grid3D::Update(const void *useData){
             }
         }
     }
-    if(!mGrid.IsVaildIndex() || !mGrid.IsVaildVertex()){
-        mGrid.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
-        mGrid.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);
-    }
-    else{
-        mGrid.UpdateIndexData(*gpu.device, indices.data(), gpu.graphics, *gpu.pool);
-        mGrid.UpdateVertexData(*gpu.device, vertices.data(), gpu.graphics, *gpu.pool);
-    }
 }
-
-void Grid4D::Cleanup(){
-    mGrid.Destroy(*gpu.device);
-}
-
-void Grid4D::Draw(vk::CommandBuffer command, vk::PipelineLayout layout){
-    mGrid.Bind(command);
-    mGrid.Draw(command);
-}
-
-void Grid4D::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
-    mGrid.Bind(command);
-    mGrid.Draw(command);
-}
-
-void Grid4D::Update(const void *useData){
-    std::vector<Vertex> vertices;
-    std::vector<uint16_t> indices;
-
+void generateGrid(std::vector<Vertex>&vertices, std::vector<uint16_t>&indices){
     const float offset = 0.25f;
     const int grid_lines = static_cast<int>(1.0f / offset + 0.5f) + 1;
 
@@ -237,6 +194,53 @@ void Grid4D::Update(const void *useData){
             }
         }
     }
+}
+void Grid3D::Cleanup(){
+    mGrid.Destroy(*gpu.device);
+}
+
+void Grid3D::Draw(vk::CommandBuffer command, vk::PipelineLayout layout){
+    mGrid.Bind(command);
+    mGrid.Draw(command);
+}
+
+void Grid3D::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
+    mGrid.Bind(command);
+    mGrid.Draw(command);
+}
+
+void Grid3D::Update(const void *useData){
+    std::vector<Vertex> vertices;
+    std::vector<uint16_t> indices;
+    generate3dGrid(vertices, indices);
+    if(!mGrid.IsVaildIndex() || !mGrid.IsVaildVertex()){
+        mGrid.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
+        mGrid.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);
+    }
+    else{
+        mGrid.UpdateIndexData(*gpu.device, indices.data(), gpu.graphics, *gpu.pool);
+        mGrid.UpdateVertexData(*gpu.device, vertices.data(), gpu.graphics, *gpu.pool);
+    }
+}
+
+void Grid4D::Cleanup(){
+    mGrid.Destroy(*gpu.device);
+}
+
+void Grid4D::Draw(vk::CommandBuffer command, vk::PipelineLayout layout){
+    mGrid.Bind(command);
+    mGrid.Draw(command);
+}
+
+void Grid4D::DrawWireframe(vk::CommandBuffer command, vk::PipelineLayout layout){
+    mGrid.Bind(command);
+    mGrid.Draw(command);
+}
+
+void Grid4D::Update(const void *useData){
+    std::vector<Vertex> vertices;
+    std::vector<uint16_t> indices;
+    generateGrid(vertices, indices);
     if(!mGrid.IsVaildIndex() || !mGrid.IsVaildVertex()){
         mGrid.CreateIndexBuffer(*gpu.device, indices.data(), sizeof(uint16_t) * indices.size(), gpu.graphics, *gpu.pool);
         mGrid.CreateVertexBuffer(*gpu.device, vertices.data(), sizeof(Vertex) * vertices.size(), vertices.size(), gpu.graphics, *gpu.pool);

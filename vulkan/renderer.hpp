@@ -32,7 +32,6 @@ namespace vulkan{
         std::vector<Synchronize>synchronize;
         std::vector<vk::CommandBuffer>commandBuffers;
 
-        std::shared_ptr<spdlog::logger>mLogger;
         void CreateRenderPass(vk::Device device);
 
         void CreateSynchronize(vk::Device device);

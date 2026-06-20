@@ -263,8 +263,9 @@ namespace vulkan{
 			uint32_t GetFileContent(const std::string&file, std::vector<DATATYPE>&data){
 				FILE *fp = fopen(file.c_str(), "rb");
 				if(!fp){
+					spdlog::error("in function {}:open file error,file name is {}", __FUNCTION__, file.c_str());
 					perror("open file error");
-					printf("file is %s\n", file.c_str());
+					printf("in function %s: file is %s\n", __FUNCTION__, file.c_str());
 					return 0;
 				}
 				uint32_t size = GetFileSize(fp);
@@ -338,12 +339,12 @@ namespace vulkan{
 namespace vulkan{
 	namespace pipeline{
 	    class Graphics:public Pipeline{
+			std::vector<vk::Format>colorFormat;
 			std::vector<vk::Rect2D>scissor = {};
 			std::vector<vk::Viewport>viewport = {};
-			vk::Format depthFormat = vk::Format::eUndefined;
-			std::vector<vk::Format>colorFormat;
 			std::vector<vk::DynamicState>dynamicState;
 			vk::RenderPass renderPass = VK_NULL_HANDLE;
+			vk::Format depthFormat = vk::Format::eUndefined;
 			std::vector<vk::VertexInputBindingDescription>bindingDescriptions;
 			std::vector<vk::VertexInputAttributeDescription>attributeDescriptions;
 			std::vector<vk::PipelineColorBlendAttachmentState>blendAttachmentState;

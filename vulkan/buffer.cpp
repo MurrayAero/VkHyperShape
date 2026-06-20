@@ -1,4 +1,5 @@
 #include "buffer.hpp"
+#include "framework.hpp"
 namespace vulkan{
     vk::CommandBuffer Buffer::BeginSingleTimeCommands(const Device&device, const Pool&pool){
         auto command = pool.AllocateCommandBuffers(device);
@@ -16,7 +17,9 @@ namespace vulkan{
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &command;
 
-        queue.submit(1, &submitInfo, VK_NULL_HANDLE);
+        auto result = queue.submit(1, &submitInfo, VK_NULL_HANDLE);
+        VK_CHECK(result);
+        VK_CHECK_LOG(result);
         queue.waitIdle();
 
         pool.FreeCommandBuffers(device, command);

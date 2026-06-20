@@ -40,9 +40,6 @@ namespace vulkan{
         instance.destroySurfaceKHR(surface);
     }
     RenderEngine::RenderEngine(){
-        spdlog::set_level(spdlog::level::debug);
-        mLogger = spdlog::basic_logger_mt("window_logger", "logs/window.logs.txt");
-        spdlog::set_default_logger(mLogger);
     }
     RenderEngine::~RenderEngine(){
         
@@ -221,7 +218,7 @@ namespace vulkan{
         return present.presentKHR(presentInfo);
     }
     void RenderEngine::DynamicRendering(vk::Device device, const Queue &vulkanQueue, void (*recordCommand)(vk::CommandBuffer, vulkan::Image &, vulkan::Image &), void (*recreateSwapchain)(void *userData), void *userData){
-        VK_CHECK_LOG(mLogger, device.waitForFences(synchronize[currentFrame].fences, VK_TRUE, UINT64_MAX));
+        VK_CHECK_LOG(device.waitForFences(synchronize[currentFrame].fences, VK_TRUE, UINT64_MAX));
         device.resetFences(synchronize[currentFrame].fences);
         if(threadCount > 0){
             std::vector<std::thread>thread(threadCount);
@@ -235,6 +232,7 @@ namespace vulkan{
         uint32_t imageIndex;
         vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, synchronize[currentFrame].imageAcquired, VK_NULL_HANDLE, &imageIndex);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)){
+            spdlog::info("in function {}:Recreating swapchain", __FUNCTION__);
             recreateSwapchain(userData);
             for (auto&it:synchronize){
                 it.Destroy(device);
@@ -244,22 +242,23 @@ namespace vulkan{
             return;
         }
         else if(result != vk::Result::eSuccess){
-            VK_CHECK_LOG(mLogger, result);
+            VK_CHECK_LOG(result);
         }
         recordCommand(commandBuffers[currentFrame], swapchain.GetImage(imageIndex), depthStencil);
         Submit(commandBuffers[currentFrame], vulkanQueue.graphics, synchronize[currentFrame].imageAcquired, synchronize[currentFrame].renderComplete, synchronize[currentFrame].fences);
         result = Present(imageIndex, vulkanQueue.present, synchronize[currentFrame].renderComplete);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)) {
+            spdlog::info("in function {}:Swapchain recreated", __FUNCTION__);
             recreateSwapchain(userData);
             return;
         }
         else if(vk::Result::eSuccess != result){
-            VK_CHECK_LOG(mLogger, result);
+            VK_CHECK_LOG(result);
         }
         currentFrame = (currentFrame + 1) % swapchain.GetImageSize();
     }
     void RenderEngine::Render(vk::Device device, const Queue &vulkanQueue, void (*recordCommand)(vk::CommandBuffer, vk::Framebuffer, vk::RenderPass), void (*recreateSwapchain)(void *userData), void *userData){
-        VK_CHECK_LOG(mLogger, device.waitForFences(synchronize[currentFrame].fences, VK_TRUE, UINT64_MAX));
+        VK_CHECK_LOG(device.waitForFences(synchronize[currentFrame].fences, VK_TRUE, UINT64_MAX));
         device.resetFences(synchronize[currentFrame].fences);
         if(threadCount > 0){
             std::vector<std::thread>thread(threadCount);
@@ -273,6 +272,7 @@ namespace vulkan{
         uint32_t imageIndex;
         vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, synchronize[currentFrame].imageAcquired, VK_NULL_HANDLE, &imageIndex);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)){
+            spdlog::info("in function {}:Swapchain recreated", __FUNCTION__);
             recreateSwapchain(userData);
             for (auto&it:synchronize){
                 it.Destroy(device);
@@ -282,17 +282,18 @@ namespace vulkan{
             return;
         }
         else if(result != vk::Result::eSuccess){
-            VK_CHECK_LOG(mLogger, result);
+            VK_CHECK_LOG(result);
         }
         recordCommand(commandBuffers[currentFrame], framebuffers[currentFrame], renderPass);
         Submit(commandBuffers[currentFrame], vulkanQueue.graphics, synchronize[currentFrame].imageAcquired, synchronize[currentFrame].renderComplete, synchronize[currentFrame].fences);
         result = Present(imageIndex, vulkanQueue.present, synchronize[currentFrame].renderComplete);
         if (recreateSwapchain && (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)) {
+            spdlog::info("in function {}:Swapchain recreated", __FUNCTION__);
             recreateSwapchain(userData);
             return;
         }
         else if(vk::Result::eSuccess != result){
-            VK_CHECK_LOG(mLogger, result);
+            VK_CHECK_LOG(result);
         }
         currentFrame = (currentFrame + 1) % swapchain.GetImageSize();
     }

@@ -7,14 +7,6 @@ namespace vulkan{
         instance.destroy();
     }
     Device::Device(){
-        spdlog::set_level(spdlog::level::debug);
-        try{
-            mLogger = spdlog::basic_logger_mt("device_logger", "logs/device.logs.txt");            
-        }
-        catch(const std::exception& e){
-            std::cerr << e.what() << '\n';
-        }
-        spdlog::set_default_logger(mLogger);
     }
     Device::~Device(){
     }
@@ -51,7 +43,7 @@ namespace vulkan{
         info.setPEnabledExtensionNames(extensions);
         info.setEnabledExtensionCount(extensions.size());
         instance = vk::createInstance(info);
-        // mLogger->info("applicationName:{}, application version:{}, {}, {}, engine name:{}, engine version:{}, {}, {}, api version:{}, {}, {}",
+        // spdlog::info("applicationName:{}, application version:{}, {}, {}, engine name:{}, engine version:{}, {}, {}, api version:{}, {}, {}",
         //     appInfo.pApplicationName, VK_VERSION_MAJOR(appInfo.applicationVersion), VK_VERSION_MINOR(appInfo.applicationVersion), VK_VERSION_PATCH(appInfo.applicationVersion),
         //     appInfo.pEngineName, VK_VERSION_MAJOR(appInfo.engineVersion), VK_VERSION_MINOR(appInfo.engineVersion), VK_VERSION_PATCH(appInfo.engineVersion),
         //     VK_VERSION_MAJOR(appInfo.apiVersion), VK_VERSION_MINOR(appInfo.apiVersion), VK_VERSION_PATCH(appInfo.apiVersion));
@@ -92,20 +84,20 @@ namespace vulkan{
     bool Device::EnableMeshShader(){
         assert(physical && "physical device is null, call SelectPhysicalDevice before calling this function");
         state.enableMeshShader = IsSupportedExtension(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-        if(mLogger)mLogger->info(state.enableMeshShader?"enable mesh shaders":"failed to enable mesh shaders");
+        spdlog::info(state.enableMeshShader?"enable mesh shaders":"failed to enable mesh shaders");
         return state.enableMeshShader;
     }
     bool Device::EnableDynamicRendering(){
         assert(physical && "physical device is null, call SelectPhysicalDevice before calling this function");
         state.enableDynamicRendering = IsSupportedExtension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-        if(mLogger)mLogger->info(state.enableDynamicRendering?"enable dynamic rendering":"failed to enable dynamic rendering");
+        spdlog::info(state.enableDynamicRendering?"enable dynamic rendering":"failed to enable dynamic rendering");
         return state.enableDynamicRendering;
     }
     bool Device::EnableFragmentStoresAndAtomics(){
         assert(physical && "physical device is null, call SelectPhysicalDevice before calling this function");
         vk::PhysicalDeviceFeatures features = physical.getFeatures();
         state.enableFragmentStoresAndAtomics = features.fragmentStoresAndAtomics;
-        if(mLogger)mLogger->info(state.enableDynamicRendering?"enable fragment stores and atomics":"failed to enable fragment stores and atomics");
+        spdlog::info(state.enableFragmentStoresAndAtomics?"enable fragment stores and atomics":"failed to enable fragment stores and atomics");
         return state.enableFragmentStoresAndAtomics;
     }
     bool Device::IsSupportedExtension(const char *extensionName) const noexcept{
@@ -120,8 +112,8 @@ namespace vulkan{
     void Device::SelectPhysicalDevice(bool (*SelectPhysicalDevice)(vk::PhysicalDevice)){
         std::vector<vk::PhysicalDevice>physicalDevices = instance.enumeratePhysicalDevices();
         if(physicalDevices.empty()){
-            if(mLogger)mLogger->error("No suitable graphics card!");
-            shutdownlogger();
+            spdlog::error("No suitable graphics card!");
+            spdlog::shutdown();
             assert(0);
             return;
         }
@@ -150,9 +142,8 @@ namespace vulkan{
         else if(physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eVirtualGpu){
             deviceType = "VIRTUAL GPU";
         }
-        if(mLogger)mLogger->info("device type:{}, device name:{}, api version:{}.{}.{}, driver version:{}, {}, {}",
-            deviceType, physicalDeviceProperties.deviceName.data(), VK_VERSION_MAJOR(physicalDeviceProperties.apiVersion), VK_VERSION_MINOR(physicalDeviceProperties.apiVersion), VK_VERSION_PATCH(physicalDeviceProperties.apiVersion),
-            VK_VERSION_MAJOR(physicalDeviceProperties.driverVersion), VK_VERSION_MINOR(physicalDeviceProperties.driverVersion), VK_VERSION_PATCH(physicalDeviceProperties.driverVersion));
+        spdlog::info("API version: {}.{}.{} (raw 0x{:08X})", VK_API_VERSION_MAJOR(physicalDeviceProperties.apiVersion), VK_API_VERSION_MINOR(physicalDeviceProperties.apiVersion), VK_API_VERSION_PATCH(physicalDeviceProperties.apiVersion),physicalDeviceProperties.apiVersion);
+        spdlog::info("device type:{}, device name:{}", deviceType, physicalDeviceProperties.deviceName.data());
     }
     uint32_t Device::GetQueueFamiliesIndex(vk::QueueFlagBits queue)const noexcept{
         int32_t queueFamilyIndex = -1;

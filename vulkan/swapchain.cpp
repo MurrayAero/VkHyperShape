@@ -105,7 +105,7 @@ namespace vulkan{
         } else {
             info.imageSharingMode = vk::SharingMode::eExclusive;
         }
-        info.clipped = VK_TRUE;//设置为VK_TRUE表示我们不关心被窗口系统中的其它窗口遮挡的像素的颜色,这允许vulkan采取一定的优化措施,但如果我们回读窗口的像素值就可能出现问题。
+        info.clipped = vk::True;//设置为VK_TRUE表示我们不关心被窗口系统中的其它窗口遮挡的像素的颜色,这允许vulkan采取一定的优化措施,但如果我们回读窗口的像素值就可能出现问题。
         info.presentMode = presentMode;
         info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
         info.preTransform = swapChainSupport.capabilities.currentTransform;

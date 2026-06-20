@@ -3,12 +3,11 @@
 #include <assert.h>
 #include "image.hpp"
 #include "queue.hpp"
-#define VK_CHECK_LOG(LOGGER, x)                                                 \
+#define VK_CHECK_LOG(x)                                                 \
 do{                                                               \
         vk::Result err = x;                                           \
         if (err != vk::Result::eSuccess){                                       \
-                LOGGER->error("vulkan error:in function {}, line {}, information {}", __FUNCTION__, __LINE__, cvmx_chip_type_to_string(err)); \
-                spdlog::default_logger()->flush();\
+                spdlog::error("vulkan error:in function {}, line {}, information {}", __FUNCTION__, __LINE__, cvmx_chip_type_to_string(err)); \
                 spdlog::shutdown();\
                 assert(0);           \
         }                                                    \

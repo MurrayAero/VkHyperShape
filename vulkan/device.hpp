@@ -87,15 +87,9 @@ namespace vulkan{
         vma::Allocator allocator = {};
         vk::PhysicalDevice physical = {};
 
-        std::shared_ptr<spdlog::logger>mLogger;
-
         vk::PhysicalDeviceProperties physicalDeviceProperties = {};
         // vk::PhysicalDeviceMemoryProperties memoryProperties = {};
         std::vector<vk::QueueFamilyProperties>queueFamiliesProperties;
-        inline void shutdownlogger(){
-            spdlog::default_logger()->flush();
-            spdlog::shutdown();
-        }
     };
 }
 #endif
