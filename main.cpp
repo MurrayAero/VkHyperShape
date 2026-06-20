@@ -177,7 +177,6 @@ struct ImGuiInput{
 #endif
     }geometry;
     struct{
-        bool preset = true;
         bool custom = false;
     }rotateMode;
     struct{
@@ -379,6 +378,7 @@ void ShowGeometry(){
                     g_ImGuiInput.geometry.SelectPipeline();
                 }
                 else if(fdGeometry == "四维网格"){
+                    g_ImGuiInput.fill = false;
                     g_ImGuiInput.geometry.SelectGrid();
                 }
                 else if(fdGeometry == "实射影平面"){
@@ -412,6 +412,7 @@ void ShowGeometry(){
                     g_ImGuiInput.geometry.SelectCylinder();
                 }
                 else if(tdGeometry == "三维网格"){
+                    g_ImGuiInput.fill = false;
                     g_ImGuiInput.geometry.SelectGrid(true);
                 }
                 break;
@@ -437,12 +438,7 @@ void ShowPlaneCombo(const char *lable){
 }
 void ShowRotate(){
     ImGui::BeginDisabled(!g_ImGuiInput.rotate_animation.stop);
-    if(g_ImGuiInput.rotateMode.preset){
-        ShowPlaneCombo("平面一");
-        ImGui::SameLine();
-        ImGui::Text("平面二:%s", GetPlaneString(g_Plane[1].plane));
-    }
-    else{
+    if(g_ImGuiInput.rotateMode.custom){
         static float planeVec[][4] = { {g_Plane[0].plane.u.x, g_Plane[0].plane.u.y, g_Plane[0].plane.u.z, g_Plane[0].plane.u.w}, {g_Plane[0].plane.v.x, g_Plane[0].plane.v.y, g_Plane[0].plane.v.z, g_Plane[0].plane.v.w} };
         if(!g_ImGuiInput.rotate_animation.stop){
             planeVec[0][0] = g_Plane[0].plane.u.x;
@@ -483,6 +479,11 @@ void ShowRotate(){
         if(ImGui::Button("获取平面二")){
             g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
         }
+    }
+    else{
+        ShowPlaneCombo("平面一");
+        ImGui::SameLine();
+        ImGui::Text("平面二:%s", GetPlaneString(g_Plane[1].plane));
     }
     ImGui::EndDisabled();
     ImGui::Checkbox("双旋转", &g_ImGuiInput.doubleRotate);
@@ -845,21 +846,14 @@ void UpdateImGui(vk::CommandBuffer command){
             ImGui::EndMenu();
         }
         if(ImGui::BeginMenu("旋转")){
-            if(ImGui::MenuItem("自由")){
-                g_ImGuiInput.rotateMode.preset = false;
-                g_ImGuiInput.rotateMode.custom = true;
-            }
-            if(ImGui::MenuItem("预设")){
-                g_ImGuiInput.rotateMode.preset = true;
-                g_ImGuiInput.rotateMode.custom = false;
-            }
+            ImGui::MenuItem("自定义", nullptr, &g_ImGuiInput.rotateMode.custom);
             if(ImGui::BeginMenu("动画")){
                 if(ImGui::MenuItem("停止", nullptr, &g_ImGuiInput.rotate_animation.stop)){
                     g_ImGuiInput.rotate_animation.plane = mglm::Plane();
                 }
                 if(ImGui::MenuItem("XY", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XY)){
                     g_ImGuiInput.rotate_animation.plane = mglm::planes::XY;
-                    g_ImGuiInput.rotateMode.preset = true;
+                    g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
@@ -868,7 +862,7 @@ void UpdateImGui(vk::CommandBuffer command){
                 }
                 if(ImGui::MenuItem("XZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XZ)){
                     g_ImGuiInput.rotate_animation.plane = mglm::planes::XZ;
-                    g_ImGuiInput.rotateMode.preset = true;
+                    g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
@@ -877,7 +871,7 @@ void UpdateImGui(vk::CommandBuffer command){
                 }
                 if(ImGui::MenuItem("YZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::YZ)){
                     g_ImGuiInput.rotate_animation.plane = mglm::planes::YZ;
-                    g_ImGuiInput.rotateMode.preset = true;
+                    g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
@@ -886,7 +880,7 @@ void UpdateImGui(vk::CommandBuffer command){
                 }
                 if(ImGui::MenuItem("XW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XW)){
                     g_ImGuiInput.rotate_animation.plane = mglm::planes::XW;
-                    g_ImGuiInput.rotateMode.preset = true;
+                    g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
@@ -895,7 +889,7 @@ void UpdateImGui(vk::CommandBuffer command){
                 }
                 if(ImGui::MenuItem("YW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::YW)){
                     g_ImGuiInput.rotate_animation.plane = mglm::planes::YW;
-                    g_ImGuiInput.rotateMode.preset = false;
+                    g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
@@ -904,7 +898,7 @@ void UpdateImGui(vk::CommandBuffer command){
                 }
                 if(ImGui::MenuItem("ZW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::ZW)){
                     g_ImGuiInput.rotate_animation.plane = mglm::planes::ZW;
-                    g_ImGuiInput.rotateMode.preset = true;
+                    g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
@@ -912,7 +906,7 @@ void UpdateImGui(vk::CommandBuffer command){
                     }
                 }
                 if(ImGui::MenuItem("随机")){
-                    g_ImGuiInput.rotateMode.preset = false;
+                    g_ImGuiInput.rotateMode.custom = true;
                     g_ImGuiInput.rotate_animation.randomPlane = true;
                     g_ImGuiInput.rotate_animation.plane = mglm::Plane();
                     if(g_ImGuiInput.rotate_animation.stop){
@@ -928,13 +922,17 @@ void UpdateImGui(vk::CommandBuffer command){
         ImGui::EndMainMenuBar();
     }
     if(ImGui::Begin("四维几何")){
+        ImGui::BeginDisabled(g_ImGuiInput.geometry.grid3d || g_ImGuiInput.geometry.grid4d);
         if(ImGui::Checkbox("填充", &g_ImGuiInput.fill)){
             UpdateUniform(g_VulkanDevice);
         }
+        ImGui::EndDisabled();
         ImGui::SameLine();
+        ImGui::BeginDisabled(g_ImGuiInput.geometry.function);
         if(ImGui::Checkbox("正交投影", &g_ImGuiInput.ortho)){
             UpdateUniform(g_VulkanDevice);
         }
+        ImGui::EndDisabled();
         static float cameraPos[][4] = {
             {g_CameraPos[0].x, g_CameraPos[0].y, g_CameraPos[0].z, g_CameraPos[0].w },
             {g_CameraPos[1].x, g_CameraPos[1].y, g_CameraPos[1].z, g_CameraPos[1].w },
@@ -966,7 +964,7 @@ void UpdateImGui(vk::CommandBuffer command){
         }
         if(g_ImGuiInput.geometry.function){
             static std::string currentFunctionItem = g_FunctionItem[2];
-            if(ImGui::SliderFloat("range", &g_ImGuiInput.parameter.function.range, 1, 4)){
+            if(ImGui::SliderFloat("range", &g_ImGuiInput.parameter.function.range, 1, 5)){
                 g_ImGuiInput.geometry.update = true;
             }
             if(ImGui::BeginCombo("复变函数", currentFunctionItem.c_str())){
