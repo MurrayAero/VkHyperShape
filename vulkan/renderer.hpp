@@ -14,12 +14,12 @@ namespace vulkan{
         void Create(vk::Device device);
         void Destroy(vk::Device device);
     };
-    class RenderEngine{
+    class Renderer{
         Image depthStencil;
         Swapchain swapchain;
         vk::SurfaceKHR surface;
         uint32_t currentFrame = 0;
-        vk::RenderPass renderPass;
+        vk::RenderPass renderPass = VK_NULL_HANDLE;
         const Device *mDevice;
         std::vector<vk::Framebuffer>framebuffers;
 
@@ -36,8 +36,8 @@ namespace vulkan{
 
         void CreateSynchronize(vk::Device device);
     public:
-        RenderEngine();
-        ~RenderEngine();
+        Renderer();
+        ~Renderer();
 
         void Cleanup();
 

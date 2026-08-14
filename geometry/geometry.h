@@ -22,7 +22,9 @@ struct UseData{
         std::array<float, 4>point[4] = { {1, 0, 0, 0}, { 0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
     }bezier;
     struct{
+        std::string error;
         float range = 1.0f;
+        std::string function = "";
         // std::complex<float>(*fun)(const std::complex<float>&) = nullptr;
         std::function<std::complex<float>(const std::complex<float> &)>fun;
     }function;

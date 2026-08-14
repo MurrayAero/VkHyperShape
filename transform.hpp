@@ -6,10 +6,10 @@
 #undef far
 #endif
 namespace mglm{
-    inline mat5 rotate(float angle, const Plane& plane) {
-        Plane p = plane.orthonormalize();
+    inline mat5 rotate(float angle, const plane& plane) {
+        mglm::plane p = plane.orthonormalize();
         vec4 u = p.u, v = p.v;
-        mat5 I = mglm::mat5(1.0f);
+        mat5 I = mat5(1.0f);
         float c = std::cos(angle), s = std::sin(angle);        
         vec5 u5(u.x, u.y, u.z, u.w, 0.0f), v5(v.x, v.y, v.z, v.w, 0.0f);
         
@@ -19,9 +19,9 @@ namespace mglm{
         mat5 term2 = s * (outerProduct(u5, v5) - outerProduct(v5, u5));
         return I + term1 + term2;
     }
-    inline mat5 rotate(const mat5& m, float theta, const Plane& plane, float theta1, const Plane& plane1) {
-        mat5 R1 = rotate(theta, plane);
-        mat5 R2 = rotate(theta1, plane1);
+    inline mat5 rotate(const mat5& m, float theta, const plane& plane1, float theta1, const plane& plane2) {
+        mat5 R1 = rotate(theta, plane1);
+        mat5 R2 = rotate(theta1, plane2);
         // 组合：m * R1 * R2(先应用R1，再R2)
         return m * R1 * R2;
     }
@@ -31,7 +31,7 @@ namespace mglm{
         vec4 u = normalize(cross(f, s, over));
         vec4 o = -normalize(cross(s, u, f));
         
-        mat5 view = mglm::mat5(1.0f);
+        mat5 view = mat5(1.0f);
         view[0][0] = s.x;   view[1][0] = s.y;   view[2][0] = s.z;   view[3][0] = s.w;
         view[0][1] = u.x;   view[1][1] = u.y;   view[2][1] = u.z;   view[3][1] = u.w;
         view[0][2] = o.x;   view[1][2] = o.y;   view[2][2] = o.z;   view[3][2] = o.w;
@@ -97,7 +97,7 @@ namespace mglm{
         return proj;
     }
     inline mat5 ortho(float left, float right, float bottom, float top, float zNear, float zFar, float wNear, float wFar) {
-        mat5 m = mglm::mat5(1.0f);
+        mat5 m = mat5(1.0f);
         m[0][0] = 2.0f / (right - left);
         m[1][1] = 2.0f / (top - bottom);
         m[2][2] = 2.0f / (zFar - zNear);
@@ -109,16 +109,16 @@ namespace mglm{
         m[4][3] = -(wFar + wNear) / (wFar - wNear);
         return m;
     }
-    inline mglm::mat5 scale(const mglm::mat5& m, const mglm::vec4& factors) {
-        mglm::mat5 scaleMat(1.0f);
+    inline mat5 scale(const mat5& m, const mglm::vec4& factors) {
+        mat5 scaleMat(1.0f);
         scaleMat[0][0] = factors.x;
         scaleMat[1][1] = factors.y;
         scaleMat[2][2] = factors.z;
         scaleMat[3][3] = factors.w;
         return m * scaleMat;
     }
-    inline mglm::mat5 translate(const mglm::mat5& m, const mglm::vec4& pos) {
-        mglm::mat5 transMat(1.0f);
+    inline mat5 translate(const mat5& m, const mglm::vec4& pos) {
+        mat5 transMat(1.0f);
         transMat[4][0] = pos.x;
         transMat[4][1] = pos.y;
         transMat[4][2] = pos.z;

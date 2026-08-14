@@ -30,7 +30,6 @@ namespace vulkan{
     }
     void Buffer::Create(const Device&device, vk::DeviceSize size, vk::BufferUsageFlags usage, vma::MemoryUsage memoryUsage, bool keepMapped){
         if(buffer != VK_NULL_HANDLE)Destroy(device);
-        // printf("in function %s: buffer %p, size %d, usage %d, memory usage\n", __FUNCTION__, buffer, size, usage, memoryUsage);
         this->size = size;
         vk::BufferCreateInfo info{};
         info.size  = size;
@@ -52,7 +51,6 @@ namespace vulkan{
         size = minUniformBufferOffset;
     }
     void Buffer::Destroy(const Device&device){
-        // printf("in function %s: buffer %p, size %d\n", __FUNCTION__, buffer, size);
         vma::Allocator allocator = device.GetAllocator();
         allocator.destroyBuffer(buffer, allocation);
         buffer = VK_NULL_HANDLE;
@@ -93,7 +91,7 @@ namespace vulkan{
     //     size = minUniformBufferOffset;
     // }
     void Buffer::UpdateData(const Device&device, const void *pData, vk::Queue queue, const Pool&pool){
-        if(!pData || buffer == VK_NULL_HANDLE)return;
+        if(!pData || buffer == VK_NULL_HANDLE)assert(0 && "buffer is nullptr");
         Buffer temporary;
         temporary.Create(device, size, vk::BufferUsageFlagBits::eTransferSrc, vma::MemoryUsage::eCpuToGpu);
         // temporary.CreateBuffer(device, size, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible|vk::MemoryPropertyFlagBits::eHostCoherent);

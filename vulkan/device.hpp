@@ -25,7 +25,7 @@ namespace vulkan{
 
     // uint32_t findMemoryTypeIndex(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
-        void SelectPhysicalDevice(bool (*SelectPhysicalDevices)(vk::PhysicalDevice) = nullptr);
+        bool SelectPhysicalDevice(bool (*SelectPhysicalDevices)(vk::PhysicalDevice) = nullptr);
         
         uint32_t GetVideoQueueFamiliesIndex()const noexcept;
         uint32_t GetQueueFamiliesIndex(vk::SurfaceKHR surface)const noexcept;

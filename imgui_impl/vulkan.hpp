@@ -35,8 +35,7 @@ namespace vulkan{
         void Cleanup();
         void Setup(const vulkan::Device&device, const vulkan::Pool&pool);
 
-        void CreatePipeline(vk::RenderPass renderPass, vk::PipelineCache cache = VK_NULL_HANDLE);
-        void CreatePipeline(vk::Format color, vk::Format depth, vk::PipelineCache cache = VK_NULL_HANDLE);
+        void CreatePipeline(vk::Format color, vk::Format depth, vk::RenderPass renderPass, vk::PipelineCache cache = VK_NULL_HANDLE);
 
         void CreateFont(const char *font, vk::Queue graphics, const vulkan::Pool&pool);
 

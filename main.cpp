@@ -5,7 +5,11 @@
 #include <iostream>
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
-
+#ifdef WIN32
+#include <windows.h>
+#include <dbghelp.h>
+#pragma comment(lib, "dbghelp.lib")
+#endif
 #include "Camera.hpp"
 #include "imgui_impl/glfw.h"
 #include "vulkan/renderer.hpp"
@@ -15,6 +19,7 @@
 #endif
 #include "geometry/grid.h"
 #include "geometry/hopf.h"
+#include "geometry/cube.h"
 #include "geometry/function.h"
 #include "geometry/cylinder.h"
 #include "geometry/pipeline.h"
@@ -27,11 +32,11 @@
 #include "geometry/sphereCone.h"
 #include "geometry/hypersphere.h"
 #include "geometry/projectivePlane.h"
-// #define USE_PERSPECTIVE
+#define RESOURCE_PATH "./resource/"
 struct ImGuiPlaneInput{
     float angle;
     std::string splane;
-    mglm::Plane plane;
+    mglm::plane plane;
     ImGuiPlaneInput(){
     }
     ImGuiPlaneInput(const std::string&splane){
@@ -47,6 +52,7 @@ struct ImGuiInput{
     struct{
         bool font = false;
         bool hopf = false;
+        bool cube = false;
         bool grid4d = false;
         bool grid3d = false;
         bool sphere = false;
@@ -69,6 +75,12 @@ struct ImGuiInput{
 #endif
         void UnSelect(){
             memset(this, 0, sizeof(*this));
+        }
+        void SelectCube(){
+            UnSelect();
+            update = true;
+            remake = true;
+            cube = true;
         }
         void SelectCylinder(){
             UnSelect();
@@ -181,7 +193,7 @@ struct ImGuiInput{
     }rotateMode;
     struct{
         bool stop = true;
-        mglm::Plane plane;
+        mglm::plane plane;
         bool randomPlane = false;
     }rotate_animation;
     bool fill = true;
@@ -192,6 +204,9 @@ struct ImGuiInput{
     bool ortho = false;
     bool mutliView = false;
     bool doubleRotate = false;
+
+    double fps;
+    double targetFrameTime = 1.0 / 60.0;
 };
 struct PushConstant{
     glm::mat4 model;
@@ -214,7 +229,7 @@ struct DepthTest{
 vulkan::Pool g_VulkanPool;
 vulkan::Queue g_VulkanQueue;
 vulkan::Device g_VulkanDevice;
-vulkan::RenderEngine g_VulkanRenderer;
+vulkan::Renderer g_VulkanRenderer;
 
 uint32_t g_WindowWidth, g_WindowHeight;
 
@@ -255,7 +270,7 @@ std::string g_FunctionItem[] = {
 DepthTest g_DepthTest;
 #endif
 std::array g_CameraPos = { mglm::vec4(0, 0, 0, 3), mglm::vec4(3, 0, 0, 0), mglm::vec4(0, 3, 0, 0), mglm::vec4(0, 0, 3, 0) };
-const char *GetPlaneString(const mglm::Plane&plane){
+const char *GetPlaneString(const mglm::plane&plane){
     std::string strPlane;
     if(mglm::abs(plane.u) == mglm::vec4(1, 0, 0, 0)){
         strPlane += "X";
@@ -285,27 +300,27 @@ const char *GetPlaneString(const mglm::Plane&plane){
 }
 void SetPlane(const std::string&splane){
     if(splane == "XY"){
-        g_Plane[0].plane = mglm::planes::XY;
+        g_Plane[0].plane = mglm::planes::xy;
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "XZ"){
-        g_Plane[0].plane = mglm::planes::XZ;
+        g_Plane[0].plane = mglm::planes::xz;
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "YZ"){
-        g_Plane[0].plane = mglm::planes::YZ;
+        g_Plane[0].plane = mglm::planes::yz;
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "XW"){
-        g_Plane[0].plane = mglm::planes::XW;
+        g_Plane[0].plane = mglm::planes::xw;
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "YW"){
-        g_Plane[0].plane = mglm::planes::YW;
+        g_Plane[0].plane = mglm::planes::yw;
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
     else if(splane == "ZW"){
-        g_Plane[0].plane = mglm::planes::ZW;
+        g_Plane[0].plane = mglm::planes::zw;
         g_Plane[1].plane = mglm::getOrthogonalPlane(g_Plane[0].plane);
     }
 }
@@ -398,7 +413,7 @@ void ShowGeometry(){
         }
         ImGui::EndCombo();
     }
-    const std::array tdCurrentItems = { "球", "圆柱体", "三维网格" };
+    const std::array tdCurrentItems = { "立方体", "球", "圆柱体", "三维网格" };
     static std::string tdGeometry = tdCurrentItems[0];
     if(ImGui::BeginCombo("三维", tdGeometry.c_str())){
         for (auto currentGeometry = tdCurrentItems.begin(); currentGeometry != tdCurrentItems.end(); ++currentGeometry){
@@ -407,6 +422,9 @@ void ShowGeometry(){
                 tdGeometry = *currentGeometry;
                 if(tdGeometry == "球"){
                     g_ImGuiInput.geometry.SelectSphere();
+                }
+                else if(tdGeometry == "立方体"){
+                    g_ImGuiInput.geometry.SelectCube();
                 }
                 else if(tdGeometry == "圆柱体"){
                     g_ImGuiInput.geometry.SelectCylinder();
@@ -429,6 +447,7 @@ void ShowPlaneCombo(const char *lable){
             bool is_selected = plane == *currentPlane;
             if (ImGui::Selectable(currentPlane->c_str(), is_selected)){
                 plane = *currentPlane;
+                UpdateUniform(g_VulkanDevice);
                 break;
             }
         }
@@ -505,7 +524,7 @@ void ShowRotate(){
 //因为我们只启动一次线程, 直到线程退出才会启动新线程, 所以需要全局变量
 void RotateAnimation(){
     float angle = 0;
-    mglm::Plane plane;
+    mglm::plane plane;
     constexpr auto targetFrameDuration = std::chrono::milliseconds(25);
     while (!g_ImGuiInput.rotate_animation.stop){
         auto frameStart = std::chrono::steady_clock::now();
@@ -849,10 +868,10 @@ void UpdateImGui(vk::CommandBuffer command){
             ImGui::MenuItem("自定义", nullptr, &g_ImGuiInput.rotateMode.custom);
             if(ImGui::BeginMenu("动画")){
                 if(ImGui::MenuItem("停止", nullptr, &g_ImGuiInput.rotate_animation.stop)){
-                    g_ImGuiInput.rotate_animation.plane = mglm::Plane();
+                    g_ImGuiInput.rotate_animation.plane = mglm::plane();
                 }
-                if(ImGui::MenuItem("XY", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XY)){
-                    g_ImGuiInput.rotate_animation.plane = mglm::planes::XY;
+                if(ImGui::MenuItem("XY", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::xy)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::xy;
                     g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
@@ -860,8 +879,8 @@ void UpdateImGui(vk::CommandBuffer command){
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("XZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XZ)){
-                    g_ImGuiInput.rotate_animation.plane = mglm::planes::XZ;
+                if(ImGui::MenuItem("XZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::xz)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::xz;
                     g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
@@ -869,8 +888,8 @@ void UpdateImGui(vk::CommandBuffer command){
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("YZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::YZ)){
-                    g_ImGuiInput.rotate_animation.plane = mglm::planes::YZ;
+                if(ImGui::MenuItem("YZ", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::yz)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::yz;
                     g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
@@ -878,8 +897,8 @@ void UpdateImGui(vk::CommandBuffer command){
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("XW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::XW)){
-                    g_ImGuiInput.rotate_animation.plane = mglm::planes::XW;
+                if(ImGui::MenuItem("XW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::xw)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::xw;
                     g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
@@ -887,8 +906,8 @@ void UpdateImGui(vk::CommandBuffer command){
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("YW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::YW)){
-                    g_ImGuiInput.rotate_animation.plane = mglm::planes::YW;
+                if(ImGui::MenuItem("YW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::yw)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::yw;
                     g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
@@ -896,8 +915,8 @@ void UpdateImGui(vk::CommandBuffer command){
                         thread.detach();
                     }
                 }
-                if(ImGui::MenuItem("ZW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::ZW)){
-                    g_ImGuiInput.rotate_animation.plane = mglm::planes::ZW;
+                if(ImGui::MenuItem("ZW", nullptr, g_ImGuiInput.rotate_animation.plane == mglm::planes::zw)){
+                    g_ImGuiInput.rotate_animation.plane = mglm::planes::zw;
                     g_ImGuiInput.rotateMode.custom = false;
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
@@ -908,7 +927,7 @@ void UpdateImGui(vk::CommandBuffer command){
                 if(ImGui::MenuItem("随机")){
                     g_ImGuiInput.rotateMode.custom = true;
                     g_ImGuiInput.rotate_animation.randomPlane = true;
-                    g_ImGuiInput.rotate_animation.plane = mglm::Plane();
+                    g_ImGuiInput.rotate_animation.plane = mglm::plane();
                     if(g_ImGuiInput.rotate_animation.stop){
                         g_ImGuiInput.rotate_animation.stop = false;
                         std::thread thread(RotateAnimation);
@@ -922,6 +941,7 @@ void UpdateImGui(vk::CommandBuffer command){
         ImGui::EndMainMenuBar();
     }
     if(ImGui::Begin("四维几何")){
+        ImGui::Text("fps:%f", g_ImGuiInput.fps);
         ImGui::BeginDisabled(g_ImGuiInput.geometry.grid3d || g_ImGuiInput.geometry.grid4d);
         if(ImGui::Checkbox("填充", &g_ImGuiInput.fill)){
             UpdateUniform(g_VulkanDevice);
@@ -967,12 +987,20 @@ void UpdateImGui(vk::CommandBuffer command){
             if(ImGui::SliderFloat("range", &g_ImGuiInput.parameter.function.range, 1, 5)){
                 g_ImGuiInput.geometry.update = true;
             }
+            static char functionString[0xff];
+            ImGui::InputText("复变函数 ", functionString, 0xff);
+            ImGui::Text("%s", g_ImGuiInput.parameter.function.error.c_str());
+            if(ImGui::Button("确定")){
+                g_ImGuiInput.geometry.update = true;
+                g_ImGuiInput.parameter.function.function = functionString;
+            }
             if(ImGui::BeginCombo("复变函数", currentFunctionItem.c_str())){
                 for (uint32_t i = 0; i < sizeof(g_FunctionItem) / sizeof(std::string); ++i){
                     bool is_selected = currentFunctionItem == g_FunctionItem[i];
                     if (ImGui::Selectable(g_FunctionItem[i].c_str(), is_selected)){
                         g_ImGuiInput.geometry.update = true;
                         currentFunctionItem = g_FunctionItem[i];
+                        g_ImGuiInput.parameter.function.function = "";
                         g_ImGuiInput.parameter.function.fun = GetFunction(currentFunctionItem);
                         break;
                     }
@@ -1114,7 +1142,7 @@ void RecordCommand(vk::CommandBuffer command, vulkan::Image&color, vulkan::Image
 #ifdef ENABE_DEPTH_TEST
     ClearDepthMap(command);
 #endif
-    vulkan::framework::BeginRendering(command, {&color}, {depth}, g_WindowWidth, g_WindowHeight);
+    vulkan::framework::BeginRendering(command, {&color}, {depth}, {g_WindowWidth, g_WindowHeight});
 
     std::array pipeline = { g_Pipeline.fill,  g_Pipeline.wireframe };
     Draw(command, pipeline.data(), pipeline.size());
@@ -1129,7 +1157,7 @@ void RecordCommand(vk::CommandBuffer command, vk::Framebuffer frame, vk::RenderP
 #ifdef ENABE_DEPTH_TEST
     ClearDepthMap(command);
 #endif
-    vulkan::framework::BeginRenderPass(command, frame, renderPass, g_WindowWidth, g_WindowHeight);
+    vulkan::framework::BeginRenderPass(command, frame, renderPass, {g_WindowWidth, g_WindowHeight});
 
     std::array pipeline = { g_Pipeline.fill,  g_Pipeline.wireframe };
     Draw(command, pipeline.data(), pipeline.size());
@@ -1185,24 +1213,17 @@ void CreatePipelineLayout(vk::Device device){
     g_Pipeline.layout = device.createPipelineLayout(info);
 }
 void CreateGraphicsPipeline(vk::Device device, VkPipelineLayout layout){
-    vk::GraphicsPipelineCreateInfo info;
     vk::PipelineVertexInputStateCreateInfo inputState{};
     std::array<vk::PipelineShaderStageCreateInfo,2> shaderStages;
     auto bindingDescriptions = Vertex::inputBindingDescription(0);
     auto attributeDescriptions = Vertex::inputAttributeDescriptions(0);
     vk::PipelineViewportStateCreateInfo viewportState = vulkan::pipeline::initializers::pipelineViewportStateCreateInfo(1, 1);
-    if(g_VulkanDevice.IsEnableDynamicRendering()){
-        info = vulkan::pipeline::initializers::pipelineCreateInfo(layout, VK_NULL_HANDLE);
-    }
-    else{
-        info = vulkan::pipeline::initializers::pipelineCreateInfo(layout, g_VulkanRenderer.GetRenderPass());
-    }
+    vk::GraphicsPipelineCreateInfo info = vulkan::pipeline::initializers::pipelineCreateInfo(layout, g_VulkanRenderer.GetRenderPass());
     const vk::ColorComponentFlags colorWriteMask = vk::ColorComponentFlagBits::eR| vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
     vk::PipelineColorBlendAttachmentState blendAttachmentState = vulkan::pipeline::initializers::pipelineColorBlendAttachmentState(colorWriteMask, vk::False);
     vk::PipelineColorBlendStateCreateInfo colorBlendState = vulkan::pipeline::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
     vk::PipelineMultisampleStateCreateInfo multisampleState = vulkan::pipeline::initializers::pipelineMultisampleStateCreateInfo(vk::SampleCountFlagBits::e1);
     vk::PipelineDepthStencilStateCreateInfo depthStencilState = vulkan::pipeline::initializers::pipelineDepthStencilStateCreateInfo(vk::True, vk::True, vk::CompareOp::eLessOrEqual);
-    // vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = vulkan::pipeline::initializers::pipelineInputAssemblyStateCreateInfo(vk::PrimitiveTopology::ePointList, vk::False);
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState = vulkan::pipeline::initializers::pipelineInputAssemblyStateCreateInfo(vk::PrimitiveTopology::eTriangleList, vk::False);
     vk::PipelineRasterizationStateCreateInfo rasterizationState = vulkan::pipeline::initializers::pipelineRasterizationStateCreateInfo(vk::PolygonMode::eFill, vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise);
     std::array<vk::DynamicState, 2> dynamicStateEnables = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -1217,8 +1238,8 @@ void CreateGraphicsPipeline(vk::Device device, VkPipelineLayout layout){
     inputState.pVertexBindingDescriptions = &bindingDescriptions;
     inputState.pVertexAttributeDescriptions = attributeDescriptions.data();
     inputState.vertexAttributeDescriptionCount = attributeDescriptions.size();
-    shaderStages[0] = vulkan::pipeline::tools::loadShader(device, "shaders/base.vert.spv", vk::ShaderStageFlagBits::eVertex);
-    shaderStages[1] = vulkan::pipeline::tools::loadShader(device, "shaders/base.frag.spv", vk::ShaderStageFlagBits::eFragment);
+    shaderStages[0] = vulkan::pipeline::tools::loadShader(device, RESOURCE_PATH"shaders/base.vert.spv", vk::ShaderStageFlagBits::eVertex);
+    shaderStages[1] = vulkan::pipeline::tools::loadShader(device, RESOURCE_PATH"shaders/base.frag.spv", vk::ShaderStageFlagBits::eFragment);
     vk::PipelineRenderingCreateInfo renderingInfo;
     if(g_VulkanDevice.IsEnableDynamicRendering()){
         renderingInfo.colorAttachmentCount = 1;
@@ -1301,7 +1322,6 @@ void Setup(GLFWwindow *window){
     glfwSetScrollCallback(window, mousescroll);
     glfwSetCursorPosCallback(window, mousecursor);
     glfwSetMouseButtonCallback(window, mousebutton);
-    // glfwSetFramebufferSizeCallback( window, FramebufferResizeCallback);
 
     SetupDescriptorSetLayout(g_VulkanDevice);
     
@@ -1321,8 +1341,8 @@ void Setup(GLFWwindow *window){
     };
     vulkan::framework::UpdateDescriptorSets(g_VulkanDevice, bindings, { g_Camera.GetUniform() }, {}, g_Set[0]);
 
-    g_Plane[0].plane = mglm::planes::XY;
-    g_Plane[1].plane = mglm::planes::ZW;
+    g_Plane[0].plane = mglm::planes::xy;
+    g_Plane[1].plane = mglm::planes::zw;
 
     g_ImGuiInput.parameter.hopf.torusAspect = CLIFFORD_R;
     g_ImGuiInput.parameter.function.fun = GetFunction("tan");
@@ -1343,13 +1363,8 @@ void Setup(GLFWwindow *window){
 
     ImGui_ImplGlfw_InitForVulkan(window, true);
     g_VulkanImGui.Setup(g_VulkanDevice, g_VulkanPool);
-    g_VulkanImGui.CreateFont("fonts/SourceHanSerifCN-Bold.otf", g_VulkanQueue.graphics, g_VulkanPool);
-    if(g_VulkanDevice.IsEnableDynamicRendering()){
-        g_VulkanImGui.CreatePipeline(g_VulkanRenderer.GetSurfaceFormat(), g_VulkanRenderer.GetDepthImage().GetFormat(), g_Pipeline.cache);
-    }
-    else{
-        g_VulkanImGui.CreatePipeline(g_VulkanRenderer.GetRenderPass(), g_Pipeline.cache);
-    }
+    g_VulkanImGui.CreateFont(RESOURCE_PATH"fonts/SourceHanSerifCN-Bold.otf", g_VulkanQueue.graphics, g_VulkanPool);
+    g_VulkanImGui.CreatePipeline(g_VulkanRenderer.GetSurfaceFormat(), g_VulkanRenderer.GetDepthImage().GetFormat(), g_VulkanRenderer.GetRenderPass(), g_Pipeline.cache);
 }
 
 void Cleanup(const vulkan::Device&device){
@@ -1395,6 +1410,9 @@ void display(GLFWwindow* window){
         delete g_Geometry;
         if(g_ImGuiInput.geometry.tesseract){
             g_Geometry = new Tesseract;
+        }
+        else if(g_ImGuiInput.geometry.cube){
+            g_Geometry = new Cube;
         }
         else if(g_ImGuiInput.geometry.sphere){
             g_Geometry = new Sphere;
@@ -1475,7 +1493,11 @@ void SetupVulkan(GLFWwindow *window){
     g_VulkanDevice.EnableValidation();
 #endif
     g_VulkanDevice.CreateInstance(extensions);
-    g_VulkanDevice.SelectPhysicalDevice(SelectPhysicalDevice);
+    if(!g_VulkanDevice.SelectPhysicalDevice(SelectPhysicalDevice)){
+        spdlog::error("No suitable graphics card!");
+        glfwSetWindowShouldClose(window, true);
+        return;
+    }
     g_VulkanDevice.EnableDynamicRendering();
 #ifdef ENABLE_DEPTH_TEST
     g_VulkanDevice.EnableFragmentStoresAndAtomics();
@@ -1508,6 +1530,8 @@ void SetupVulkan(GLFWwindow *window){
         break;
     }
 	printf("gpu name:%s, gpu type:%s\n", physicalDeviceProperties.deviceName, deviceType);
+    spdlog::info("API version: {}.{}.{} (raw 0x{:08X})", VK_API_VERSION_MAJOR(physicalDeviceProperties.apiVersion), VK_API_VERSION_MINOR(physicalDeviceProperties.apiVersion), VK_API_VERSION_PATCH(physicalDeviceProperties.apiVersion),physicalDeviceProperties.apiVersion);
+    spdlog::info("device type:{}, device name:{}", deviceType, physicalDeviceProperties.deviceName.data());
 }
 void CleanupVulkan(){
     g_VulkanPool.Cleanup(g_VulkanDevice);
@@ -1521,61 +1545,63 @@ glm::uvec2 GetScreenSize(){
     const GLFWvidmode* mode = glfwGetVideoMode(primary);
     return glm::uvec2(mode->width, mode->height);
 }
+double calculateFPS(double updateInterval = 1.0) {
+    static int frameCount = 0;
+    static double accumulatedTime = 0.0;
+    static double lastFPS = 0.0;
+    static auto lastTime = std::chrono::high_resolution_clock::now();
+
+    auto now = std::chrono::high_resolution_clock::now();
+    double delta = std::chrono::duration<double>(now - lastTime).count();
+    lastTime = now;
+
+    frameCount++;
+    accumulatedTime += delta;
+
+    if (accumulatedTime >= updateInterval) {
+        lastFPS = frameCount / accumulatedTime;
+        frameCount = 0;
+        accumulatedTime = 0.0;
+    }
+
+    return lastFPS;
+}
 #ifdef _WIN32
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
-    g_Logger->flush_on(spdlog::level::err);
-    spdlog::set_level(spdlog::level::err);
-    spdlog::set_default_logger(g_Logger);
-    if (GLFW_FALSE == glfwInit()) {
-        printf("initialize glfw error");
-        return 1;
+LONG WINAPI MyExceptionFilter(EXCEPTION_POINTERS *ep) {
+    HANDLE hFile = CreateFileA("crash.dmp", GENERIC_WRITE, 0, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        MINIDUMP_EXCEPTION_INFORMATION mdei;
+        mdei.ThreadId          = GetCurrentThreadId();
+        mdei.ExceptionPointers = ep;
+        mdei.ClientPointers    = FALSE;
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
+                          hFile, MiniDumpWithFullMemory, &mdei, NULL, NULL);
+        CloseHandle(hFile);
     }
-    auto screenSize = GetScreenSize();
-    g_WindowWidth = std::min(screenSize.x, screenSize.y) * .8;
-    g_WindowHeight = g_WindowWidth;
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window = glfwCreateWindow(g_WindowWidth, g_WindowHeight, "demo", NULL, NULL);
-    // Setup Vulkan
-    if (!glfwVulkanSupported()){
-        printf("GLFW: Vulkan Not Supported\n");
-        return 1;
-    }
-    SetupVulkan(window);
-    Setup(window);
-
-    const double targetFrameTime = 1.0 / 60.0; // 目标帧时间（例如60 FPS）
-    auto previousTime = std::chrono::high_resolution_clock::now();
-    while (!glfwWindowShouldClose(window)) {
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        double elapsedTime = std::chrono::duration<double>(currentTime - previousTime).count();
-
-        if (elapsedTime < targetFrameTime) {
-            double sleepTime = (targetFrameTime - elapsedTime) * 1000;
-            std::this_thread::sleep_for(std::chrono::milliseconds((int)sleepTime));
-        }
-
-        previousTime = std::chrono::high_resolution_clock::now();
-        // proccessInput(window);
-        display(window);
-
-        glfwPollEvents();
-    }
-	glfwTerminate();
-
-    g_VulkanDevice.waitIdle();
-    Cleanup(g_VulkanDevice);
-    CleanupVulkan();
-    spdlog::shutdown();
-    return 0;
+    return EXCEPTION_EXECUTE_HANDLER; // 让程序终止
 }
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 #else
-int main(){
+int main()
+#endif
+{
+#ifdef WIN32
+    SetUnhandledExceptionFilter(MyExceptionFilter);
+#endif
     g_Logger->flush_on(spdlog::level::err);
+#ifdef NDEBUG
+    spdlog::set_level(spdlog::level::info);
+#else
     spdlog::set_level(spdlog::level::debug);
+#endif // NDEBUG
     spdlog::set_default_logger(g_Logger);
     if (GLFW_FALSE == glfwInit()) {
-        printf("initialize glfw error");
-        return 1;
+        const char* desc = nullptr;
+        int err = glfwGetError(&desc);
+        printf("glfwInit failed, code=%d, desc = %s\n", err, desc ? desc : "(null)");
+        spdlog::error("glfwInit failed, code={:#x}, desc ={}", err, desc ? desc : "(null)");
+        return -1;
     }
     auto screenSize = GetScreenSize();
     g_WindowWidth = std::min(screenSize.x, screenSize.y) * .8;
@@ -1584,28 +1610,33 @@ int main(){
     GLFWwindow* window = glfwCreateWindow(g_WindowWidth, g_WindowHeight, "demo", NULL, NULL);
     // Setup Vulkan
     if (!glfwVulkanSupported()){
-        printf("GLFW: Vulkan Not Supported\n");
-        return 1;
+        const char* desc = nullptr;
+        int err = glfwGetError(&desc);
+        printf("GLFW: Vulkan Not Supported, Error Code=%d, desc = %s\n", err, desc ? desc : "(null)");
+        spdlog::error("GLFW: Vulkan Not Supported, Error Code={:#x}, desc = {}", err, desc ? desc : "(null)");
+        return -1;
     }
     SetupVulkan(window);
     Setup(window);
 
-    const double targetFrameTime = 1.0 / 60.0; // 目标帧时间(例如60 FPS)
     auto previousTime = std::chrono::high_resolution_clock::now();
     while (!glfwWindowShouldClose(window)) {
         auto currentTime = std::chrono::high_resolution_clock::now();
         double elapsedTime = std::chrono::duration<double>(currentTime - previousTime).count();
 
-        if (elapsedTime < targetFrameTime) {
-            double sleepTime = (targetFrameTime - elapsedTime) * 1000;
+        if (elapsedTime < g_ImGuiInput.targetFrameTime) {
+            double sleepTime = (g_ImGuiInput.targetFrameTime - elapsedTime) * 1000;
             std::this_thread::sleep_for(std::chrono::milliseconds((int)sleepTime));
         }
 
         previousTime = std::chrono::high_resolution_clock::now();
-        // proccessInput(window);
         glfwPollEvents();
 
+        // proccessInput(window);
+
         display(window);
+
+        g_ImGuiInput.fps = calculateFPS();
     }
 	glfwTerminate();
 
@@ -1615,4 +1646,3 @@ int main(){
     spdlog::shutdown();
     return 0;
 }
-#endif

@@ -29,7 +29,7 @@ namespace vulkan{
         // 	renderComplete[i] = device.createSemaphore(info);
         // }
     }
-    void RenderEngine::Cleanup(){
+    void Renderer::Cleanup(){
         vk::Device dev = *mDevice;
         dev.destroyRenderPass(renderPass);
         for (auto&it:synchronize){
@@ -39,12 +39,12 @@ namespace vulkan{
         auto instance = mDevice->GetInstance();
         instance.destroySurfaceKHR(surface);
     }
-    RenderEngine::RenderEngine(){
+    Renderer::Renderer(){
     }
-    RenderEngine::~RenderEngine(){
+    Renderer::~Renderer(){
         
     }
-    void RenderEngine::CleanupSwapchain(){
+    void Renderer::CleanupSwapchain(){
         vk::Device dev = *mDevice;
         depthStencil.Destroy(*mDevice);
         for (auto&it:framebuffers){
@@ -52,10 +52,10 @@ namespace vulkan{
         }
         swapchain.Cleanup(*mDevice);
     }
-    void RenderEngine::CreateSwapchain(uint32_t width, uint32_t height){
+    void Renderer::CreateSwapchain(uint32_t width, uint32_t height){
         swapchain.Create(*mDevice, surface, width, height);
     }
-    void RenderEngine::CreateDepthImage(){
+    void Renderer::CreateDepthImage(){
         vk::Extent3D size;
         auto swapchainExtent = GetSwapchainSize();
         size.depth = 1;
@@ -65,7 +65,7 @@ namespace vulkan{
         depthStencil.Create(*mDevice, size, vk::ImageUsageFlagBits::eDepthStencilAttachment, DEPTH_FORMAT);
         depthStencil.CreateView(*mDevice);
     }
-    void RenderEngine::CreateFrameBuffer(){
+    void Renderer::CreateFrameBuffer(){
         auto swapchainExtent = GetSwapchainSize();
         framebuffers.resize(swapchain.GetImageSize());
         std::array<vk::ImageView, 2>frameBufferAttachments;
@@ -86,7 +86,7 @@ namespace vulkan{
             framebuffers[i] = dev.createFramebuffer(info);
         }
     }
-    void RenderEngine::CreateSynchronize(vk::Device device){
+    void Renderer::CreateSynchronize(vk::Device device){
         synchronize.resize(swapchain.GetImageSize());
         for (auto&it:synchronize){
             it.Create(device);
@@ -152,7 +152,7 @@ namespace vulkan{
 
     //     renderPass = device.createRenderPass2(createInfo);
     // }
-    void RenderEngine::CreateRenderPass(vk::Device device){
+    void Renderer::CreateRenderPass(vk::Device device){
         std::array<vk::SubpassDependency, 1> dependency = {};
         dependency[0].setDstSubpass(0);
         dependency[0].setSrcSubpass(VK_SUBPASS_EXTERNAL);
@@ -206,7 +206,7 @@ namespace vulkan{
         info.attachmentCount = attachmentDescription.size();
         renderPass = device.createRenderPass(info);
     }
-    vk::Result RenderEngine::Present(uint32_t imageIndex, const vk::Queue present, const vk::Semaphore&renderComplete){
+    vk::Result Renderer::Present(uint32_t imageIndex, const vk::Queue present, const vk::Semaphore&renderComplete){
         vk::SwapchainKHR swapchain = this->swapchain;
         vk::PresentInfoKHR presentInfo = {};
         presentInfo.sType = vk::StructureType::ePresentInfoKHR;
@@ -217,7 +217,7 @@ namespace vulkan{
         presentInfo.pWaitSemaphores = &renderComplete;
         return present.presentKHR(presentInfo);
     }
-    void RenderEngine::DynamicRendering(vk::Device device, const Queue &vulkanQueue, void (*recordCommand)(vk::CommandBuffer, vulkan::Image &, vulkan::Image &), void (*recreateSwapchain)(void *userData), void *userData){
+    void Renderer::DynamicRendering(vk::Device device, const Queue &vulkanQueue, void (*recordCommand)(vk::CommandBuffer, vulkan::Image &, vulkan::Image &), void (*recreateSwapchain)(void *userData), void *userData){
         VK_CHECK_LOG(device.waitForFences(synchronize[currentFrame].fences, VK_TRUE, UINT64_MAX));
         device.resetFences(synchronize[currentFrame].fences);
         if(threadCount > 0){
@@ -257,7 +257,7 @@ namespace vulkan{
         }
         currentFrame = (currentFrame + 1) % swapchain.GetImageSize();
     }
-    void RenderEngine::Render(vk::Device device, const Queue &vulkanQueue, void (*recordCommand)(vk::CommandBuffer, vk::Framebuffer, vk::RenderPass), void (*recreateSwapchain)(void *userData), void *userData){
+    void Renderer::Render(vk::Device device, const Queue &vulkanQueue, void (*recordCommand)(vk::CommandBuffer, vk::Framebuffer, vk::RenderPass), void (*recreateSwapchain)(void *userData), void *userData){
         VK_CHECK_LOG(device.waitForFences(synchronize[currentFrame].fences, VK_TRUE, UINT64_MAX));
         device.resetFences(synchronize[currentFrame].fences);
         if(threadCount > 0){
@@ -297,7 +297,7 @@ namespace vulkan{
         }
         currentFrame = (currentFrame + 1) % swapchain.GetImageSize();
     }
-    void RenderEngine::Submit(const vk::CommandBuffer&commandbuffers, vk::Queue graphics, const vk::Semaphore&imageAcquired, const vk::Semaphore&renderComplete, const vk::Fence&fence){
+    void Renderer::Submit(const vk::CommandBuffer&commandbuffers, vk::Queue graphics, const vk::Semaphore&imageAcquired, const vk::Semaphore&renderComplete, const vk::Fence&fence){
         vk::SubmitInfo submitInfo = {};
         vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
         submitInfo.sType = vk::StructureType::eSubmitInfo;
@@ -311,7 +311,7 @@ namespace vulkan{
         graphics.submit(submitInfo, fence);
     }
 
-    void RenderEngine::Setup(const Device &device, uint32_t width, uint32_t height, const vulkan::Pool&pool){
+    void Renderer::Setup(const Device &device, uint32_t width, uint32_t height, const vulkan::Pool&pool){
         mDevice = &device;
         CreateSwapchain(width, height);
         CreateDepthImage();
@@ -322,7 +322,7 @@ namespace vulkan{
         CreateSynchronize(device);
         commandBuffers = pool.AllocateCommandBuffers(device, swapchain.GetImageSize());
     }
-    void RenderEngine::SetThreadFun(void(*threadFun)(vk::CommandBuffer, uint32_t), uint32_t threadCount)noexcept{
+    void Renderer::SetThreadFun(void(*threadFun)(vk::CommandBuffer, uint32_t), uint32_t threadCount)noexcept{
         if(threadCount > 0){
             this->threadFun = threadFun;
             this->threadCount = threadCount;

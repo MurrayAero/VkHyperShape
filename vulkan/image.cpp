@@ -33,7 +33,6 @@ namespace vulkan{
         vma::AllocationInfo allocationInfo;
         vma::Allocator allocator = device.GetAllocator();
         std::tie(image, allocation) = allocator.createImage(info, allocCI, allocationInfo);
-        // printf("in function %s: image %p, width %d, height %d\n", __FUNCTION__, image, size.width, size.height);
     }
     void Image::Create(const Device&device, const vk::Extent3D&extent, vk::ImageUsageFlags usage, vk::Format format){
         Create(device, extent, usage, format, 1);
@@ -228,7 +227,6 @@ namespace vulkan{
     }
 
     void Image::Destroy(const Device&device){
-        // printf("in function %s: image %p, width %d, height %d\n", __FUNCTION__, image, size.width, size.height);
         vk::Device dev = device;
         vma::Allocator allocator = device.GetAllocator();
         allocator.destroyImage(image, allocation);

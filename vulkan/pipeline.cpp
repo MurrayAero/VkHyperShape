@@ -115,7 +115,7 @@ vulkan::pipeline::Graphics::~Graphics(){
 void vulkan::pipeline::Graphics::Bind(vk::CommandBuffer command)const noexcept{
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines);
 }
-void vulkan::pipeline::Graphics::Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache){
+bool vulkan::pipeline::Graphics::Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache){
     if(isWindowSizeInvalid()){
         if(dynamicState.empty() || std::find(dynamicState.begin(), dynamicState.end(), vk::DynamicState::eViewport) == dynamicState.end() ||
             std::find(dynamicState.begin(), dynamicState.end(), vk::DynamicState::eScissor) == dynamicState.end()){
@@ -127,7 +127,8 @@ void vulkan::pipeline::Graphics::Create(vk::Device device, vk::PipelineLayout la
     info = initializers::pipelineCreateInfo(layout, renderPass);
     if(shaderStages.empty()){
         spdlog::error("in function {}:shaders is empty", __FUNCTION__);
-        assert(0 && "shaderStages.empty()");
+        Destroy(device);
+        return false;
     }
     if(blendAttachmentState.empty())PushColorBlendAttachmentState();
     vk::PipelineColorBlendStateCreateInfo colorBlendState = initializers::pipelineColorBlendStateCreateInfo(blendAttachmentState.size(), blendAttachmentState.data());
@@ -157,11 +158,8 @@ void vulkan::pipeline::Graphics::Create(vk::Device device, vk::PipelineLayout la
 
     info.pVertexInputState = &inputState;
     info.pViewportState = &viewportState;
-    for (auto&it:shaderStages){
-        if(it.stage == vk::ShaderStageFlagBits::eTessellationControl || it.stage == vk::ShaderStageFlagBits::eTessellationEvaluation){
-            info.pTessellationState = &tessellationState;
-            break;
-        }
+    if(tessellationState.patchControlPoints > 0){
+        info.pTessellationState = &tessellationState;
     }
     if(!dynamicState.empty())info.pDynamicState = &dynamicStateinfo;
     info.pColorBlendState = &colorBlendState;
@@ -172,17 +170,21 @@ void vulkan::pipeline::Graphics::Create(vk::Device device, vk::PipelineLayout la
     auto result = device.createGraphicsPipeline(cache, info);
     if(result.result == vk::Result::eSuccess){
         pipelines = result.value;
+        spdlog::debug("in function {}:pipelines:{:#x}", __FUNCTION__, (uintptr_t)(VkPipeline)pipelines);
     }
     else{
-        VK_CHECK(result.result);
         VK_CHECK_LOG(result.result);
+        Destroy(device);
+        return false;
     }
     for (auto&it:shaderStages){
         device.destroyShaderModule(it.module);
     }
     shaderStages.clear();
+    return true;
 }
 void vulkan::pipeline::Graphics::Destroy(vk::Device device)noexcept{
+    spdlog::debug("in function {}:pipelines:{:#x}", __FUNCTION__, (uintptr_t)(VkPipeline)pipelines);
     device.destroyPipeline(pipelines);
     scissor.clear();
     viewport.clear();
@@ -191,6 +193,10 @@ void vulkan::pipeline::Graphics::Destroy(vk::Device device)noexcept{
     dynamicState.clear();
     bindingDescriptions.clear();
     attributeDescriptions.clear();
+    for (auto&it:shaderStages){
+        device.destroyShaderModule(it.module);
+    }
+    shaderStages.clear();
 }
 vulkan::pipeline::Compute::Compute(){
 }
@@ -199,10 +205,11 @@ vulkan::pipeline::Compute::~Compute(){
 void vulkan::pipeline::Compute::Bind(vk::CommandBuffer command)const noexcept{
     command.bindPipeline(vk::PipelineBindPoint::eCompute, pipelines);
 }
-void vulkan::pipeline::Compute::Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache){
+bool vulkan::pipeline::Compute::Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache){
     if(shaderStages.empty()){
         spdlog::error("in function {}:shaders is empty", __FUNCTION__);
-        assert(0 && "shaderStages.empty()");
+        device.destroyShaderModule(shaderStages[0].module);
+        return false;
     }
     vk::ComputePipelineCreateInfo info = {};
     info.sType = vk::StructureType::eComputePipelineCreateInfo;
@@ -211,10 +218,18 @@ void vulkan::pipeline::Compute::Create(vk::Device device, vk::PipelineLayout lay
     auto result = device.createComputePipeline(cache, info);
     if(result.result == vk::Result::eSuccess){
         pipelines = result.value;
+        spdlog::debug("in function {}:pipelines:{:#x}", __FUNCTION__, (uintptr_t)(VkPipeline)pipelines);
+    }
+    else{
+        VK_CHECK_LOG(result.result);
+        device.destroyShaderModule(shaderStages[0].module);
+        return false;
     }
     device.destroyShaderModule(shaderStages[0].module);
+    return true;
 }
 void vulkan::pipeline::Compute::Destroy(vk::Device device)noexcept{
+    spdlog::debug("in function {}:pipelines:{:#x}", __FUNCTION__, (uintptr_t)(VkPipeline)pipelines);
     shaderStages.clear();
     device.destroyPipeline(pipelines);
 }

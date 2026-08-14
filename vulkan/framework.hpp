@@ -8,8 +8,6 @@ do{                                                               \
         vk::Result err = x;                                           \
         if (err != vk::Result::eSuccess){                                       \
                 spdlog::error("vulkan error:in function {}, line {}, information {}", __FUNCTION__, __LINE__, cvmx_chip_type_to_string(err)); \
-                spdlog::shutdown();\
-                assert(0);           \
         }                                                    \
 } while (0)
 #define VK_CHECK(x)                                                 \
@@ -25,8 +23,9 @@ const char *cvmx_chip_type_to_string(vk::Result type);
 namespace vulkan{
         namespace framework{
                 void BeginCommands(vk::CommandBuffer command, vk::CommandBufferUsageFlags flags, vk::CommandBufferInheritanceInfo*inheritanceInfo = nullptr);
-                void BeginRenderPass(vk::CommandBuffer command, vk::Framebuffer frame, vk::RenderPass renderPass, uint32_t windowWidth, uint32_t windowHeight);
-                void BeginRendering(vk::CommandBuffer command, const std::vector<Image*>&color, Image&depth, uint32_t windowWidth, uint32_t windowHeight, vk::RenderingFlags flags = {});
+
+                void BeginRenderPass(vk::CommandBuffer command, vk::Framebuffer frame, vk::RenderPass renderPass, const vk::Extent2D&windowSize, const vk::ClearColorValue&clear = {.1f, .1f, .1f, 1.0f});
+                void BeginRendering(vk::CommandBuffer command, const std::vector<Image*>&color, Image&depth, const vk::Extent2D&windowSize, const vk::ClearColorValue&clear = {.1f, .1f, .1f, 1.0f}, vk::RenderingFlags flags = {});
 
                 vk::CommandBuffer BeginSingleTimeCommands(vk::Device device, const Pool&pool);
 
@@ -36,7 +35,9 @@ namespace vulkan{
                 void EndRendering(vk::CommandBuffer command, const std::vector<Image*>&color);
                 void EndSingleTimeCommands(vk::CommandBuffer command, vk::Queue queue, vk::Device device, const Pool&pool);
 
-		void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler = {}, bool shaderReadOnlyImageLayout = true);
+		void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, vk::DescriptorSet &destSet);
+		void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler = {}, bool shaderreadonlay = true);
+		void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler = {}, bool shaderreadonlay = true);
         };
 }
 #endif

@@ -311,7 +311,7 @@ namespace vulkan{
 			~Pipeline();
 
 			virtual void Bind(vk::CommandBuffer command) const noexcept = 0;
-			virtual void Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache) = 0;
+			virtual bool Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache) = 0;
 
 			virtual void Destroy(vk::Device device)noexcept = 0;
 
@@ -348,7 +348,7 @@ namespace vulkan{
 			std::vector<vk::VertexInputBindingDescription>bindingDescriptions;
 			std::vector<vk::VertexInputAttributeDescription>attributeDescriptions;
 			std::vector<vk::PipelineColorBlendAttachmentState>blendAttachmentState;
-    		vk::PipelineTessellationStateCreateInfo tessellationState = initializers::pipelineTessellationStateCreateInfo(4);
+    		vk::PipelineTessellationStateCreateInfo tessellationState = initializers::pipelineTessellationStateCreateInfo(0);
 			vk::ColorComponentFlags colorWriteMask = vk::ColorComponentFlagBits::eR| vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 			vk::PipelineMultisampleStateCreateInfo multisampleState = initializers::pipelineMultisampleStateCreateInfo(vk::SampleCountFlagBits::e1);
 			vk::PipelineDepthStencilStateCreateInfo depthStencilState = initializers::pipelineDepthStencilStateCreateInfo(vk::False, vk::True, vk::CompareOp::eLessOrEqual);
@@ -365,7 +365,7 @@ namespace vulkan{
 				return *this;
 			}
 			virtual void Bind(vk::CommandBuffer command)const noexcept;
-			virtual void Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache);
+			virtual bool Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache);
 			virtual void Destroy(vk::Device device)noexcept;
 
 			inline void PushDynamicState(vk::DynamicState state){
@@ -501,7 +501,7 @@ namespace vulkan{
 			Compute();
 			~Compute();
 			virtual void Bind(vk::CommandBuffer command)const noexcept;
-			virtual void Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache);
+			virtual bool Create(vk::Device device, vk::PipelineLayout layout, vk::PipelineCache cache);
 			virtual void Destroy(vk::Device device)noexcept;
 
 			virtual void PushShaders(vk::Device device, const std::string&shaders);

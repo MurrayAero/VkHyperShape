@@ -82,9 +82,9 @@ namespace vulkan{
 
             pool.FreeCommandBuffers(device, command);
         }
-        void BeginRenderPass(vk::CommandBuffer command, vk::Framebuffer frame, vk::RenderPass renderPass, uint32_t windowWidth, uint32_t windowHeight){
+        void BeginRenderPass(vk::CommandBuffer command, vk::Framebuffer frame, vk::RenderPass renderPass, const vk::Extent2D&windowSize, const vk::ClearColorValue&clear){
             std::vector<vk::ClearValue> clearValues(3);
-            clearValues[0].color = { .1f , .1f , .1f , 1.0f };
+            clearValues[0].color = clear;
             clearValues[1].depthStencil =  vk::ClearDepthStencilValue(1.0f, 0);
             vk::RenderPassBeginInfo info = {};
             info.sType = vk::StructureType::eRenderPassBeginInfo;
@@ -92,10 +92,10 @@ namespace vulkan{
             info.renderPass = renderPass;
             info.pClearValues = clearValues.data();
             info.clearValueCount = clearValues.size();
-            info.renderArea = { 0, 0, windowWidth, windowHeight };
+            info.renderArea = { 0, 0, windowSize.width, windowSize.height };
             command.beginRenderPass(info,vk::SubpassContents::eInline);
         }
-        void BeginRendering(vk::CommandBuffer command, const std::vector<Image*>&color, Image&depth, uint32_t windowWidth, uint32_t windowHeight, vk::RenderingFlags flags){
+        void BeginRendering(vk::CommandBuffer command, const std::vector<Image*>&color, Image&depth, const vk::Extent2D&windowSize, const vk::ClearColorValue&clear, vk::RenderingFlags flags){
             for (auto&it:color){
                 it->SetLayout(command, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite);
             }
@@ -106,7 +106,7 @@ namespace vulkan{
                 colorAttachment[i].imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
                 colorAttachment[i].loadOp = vk::AttachmentLoadOp::eClear;
                 colorAttachment[i].storeOp = vk::AttachmentStoreOp::eStore;
-                colorAttachment[i].clearValue.color = {0.1f, 0.1f, 0.1f, 1.0f};    
+                colorAttachment[i].clearValue.color = clear;
             }
             vk::RenderingAttachmentInfo depthAttachment = {};
             depthAttachment.imageView = depth.GetView();
@@ -121,8 +121,8 @@ namespace vulkan{
             renderingInfo.pDepthAttachment = &depthAttachment;
             renderingInfo.pColorAttachments = colorAttachment.data();
             renderingInfo.colorAttachmentCount = colorAttachment.size();
-            renderingInfo.renderArea.setOffset(vk::Offset2D(0,0));
-            renderingInfo.renderArea.setExtent(vk::Extent2D(windowWidth, windowHeight));
+            renderingInfo.renderArea.setOffset(vk::Offset2D());
+            renderingInfo.renderArea.setExtent(windowSize);
             command.beginRendering(&renderingInfo);
         }
         void EndRendering(vk::CommandBuffer command, Image&color){
@@ -137,7 +137,13 @@ namespace vulkan{
                 it->SetLayout(command, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits::eBottomOfPipe, vk::AccessFlagBits::eMemoryRead);
             }
         }
-        void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler, bool shaderReadOnlyImageLayout){
+        void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, vk::DescriptorSet &destSet){
+            UpdateDescriptorSets(device, bindings, buffer, {}, destSet);
+        }
+        void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler, bool shaderreadonlay){
+            UpdateDescriptorSets(device, bindings, {}, image, destSet, sampler, shaderreadonlay);
+        }
+        void UpdateDescriptorSets(vk::Device device, const std::vector<vk::DescriptorSetLayoutBinding> &bindings, const std::vector<vulkan::Buffer> &buffer, const std::vector<vulkan::Image> &image, vk::DescriptorSet &destSet, const vk::Sampler &sampler, bool shaderreadonly){
             std::array<uint32_t, 2>index = {};//一个uniform一个图片采样器。如果需要其他则个数必须增加
             std::vector<vk::WriteDescriptorSet>writeDescriptorSets;
             std::vector<vk::DescriptorBufferInfo>descriptorBufferInfo(buffer.size());
@@ -162,7 +168,7 @@ namespace vulkan{
                             descriptorImageInfo[index[1]].imageLayout = vk::ImageLayout::eGeneral;
                         }
                         else{
-                            if(shaderReadOnlyImageLayout){
+                            if(shaderreadonly){
                                 descriptorImageInfo[index[1]].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
                             }
                             else{

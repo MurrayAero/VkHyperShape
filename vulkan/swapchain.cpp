@@ -46,16 +46,16 @@ vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormat
 vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availableModes) {
     constexpr std::array preferredModes = {
         vk::PresentModeKHR::eMailbox,// 最佳平衡：垂直同步+低延迟
-        vk::PresentModeKHR::eFifo,// 严格垂直同步
         vk::PresentModeKHR::eFifoRelaxed,// 自适应垂直同步
-        vk::PresentModeKHR::eImmediate// 无垂直同步
+        vk::PresentModeKHR::eImmediate,// 无垂直同步
+        vk::PresentModeKHR::eFifo// 严格垂直同步
     };
     for (auto preferred : preferredModes) {
         if (std::find(availableModes.begin(), availableModes.end(), preferred) != availableModes.end()) {
             return preferred;
         }
     }
-    return availableModes.empty() ? vk::PresentModeKHR::eFifo : availableModes[0];
+    return vk::PresentModeKHR::eFifo;
 }
 namespace vulkan{
     Swapchain::Swapchain(){
@@ -120,7 +120,9 @@ namespace vulkan{
             images[i].SetImage(swapchainImages[i]);
             images[i].SetFormt(surfaceFormat.format);
             images[i].CreateView(device);       
-        }    
+        }
+
+        spdlog::info("in function {}:surface format:{}, image count:{}, present mode:{}, width:{}, height:{}", __FUNCTION__, (uint32_t)(VkFormat)surfaceFormat.format, imageCount, (uint32_t)(VkPresentModeKHR)presentMode, extent.width, extent.height);
     }
     void Swapchain::Cleanup(const Device&device){
         vk::Device dev = device;

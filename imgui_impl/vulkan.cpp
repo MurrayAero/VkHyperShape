@@ -186,41 +186,13 @@ namespace vulkan{
         SetupDescriptorSetLayout(device);
         mSet = pool.AllocateDescriptorSets(device, {mSetLayout})[0];
     }
-
-    void ImGui::CreatePipeline(vk::RenderPass renderPass, vk::PipelineCache cache){
+    
+    void ImGui::CreatePipeline(vk::Format color, vk::Format depth, vk::RenderPass renderPass, vk::PipelineCache cache){
         CreatePipelineLayout(*mDevice);
 
         pipelines.pipeline.PushColorBlendAttachmentState();
 
-        pipelines.pipeline.EnableColorBlend();
         pipelines.pipeline.SetRenderPass(renderPass);
-        pipelines.pipeline.PushDynamicState(vk::DynamicState::eScissor);
-        pipelines.pipeline.PushDynamicState(vk::DynamicState::eViewport);
-
-        pipelines.pipeline.SetCullMode(vk::CullModeFlagBits::eNone);
-
-        pipelines.pipeline.PushShaders(*mDevice, vk::ShaderStageFlagBits::eVertex, __glsl_shader_vert_spv, sizeof(__glsl_shader_vert_spv));
-        pipelines.pipeline.PushShaders(*mDevice, vk::ShaderStageFlagBits::eFragment, __glsl_shader_frag_spv, sizeof(__glsl_shader_frag_spv));
-
-        pipelines.pipeline.SetColorBlendOp(vk::BlendOp::eAdd);
-        pipelines.pipeline.SetAlphaBlendOp(vk::BlendOp::eAdd);
-        pipelines.pipeline.SetSrcAlphaBlendFactor(vk::BlendFactor::eOne);
-        pipelines.pipeline.SetSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha);
-        pipelines.pipeline.SetDstAlphaBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
-        pipelines.pipeline.SetDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha);
-        
-        pipelines.pipeline.PushVertexInputBindingDescription(0, sizeof(ImDrawVert));
-
-        pipelines.pipeline.PushVertInputAttributeDescription(0, vk::Format::eR32G32Sfloat, IM_OFFSETOF(ImDrawVert, pos));
-        pipelines.pipeline.PushVertInputAttributeDescription(1, vk::Format::eR32G32Sfloat, IM_OFFSETOF(ImDrawVert, uv));
-        pipelines.pipeline.PushVertInputAttributeDescription(2, vk::Format::eR8G8B8A8Unorm, IM_OFFSETOF(ImDrawVert, col));
-
-        pipelines.pipeline.Create(*mDevice, pipelines.layout, cache);
-    }
-    void ImGui::CreatePipeline(vk::Format color, vk::Format depth, vk::PipelineCache cache){
-        CreatePipelineLayout(*mDevice);
-
-        pipelines.pipeline.PushColorBlendAttachmentState();
 
         pipelines.pipeline.EnableColorBlend();
         pipelines.pipeline.SetDepthFormat(depth);

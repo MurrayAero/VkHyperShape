@@ -341,32 +341,32 @@ namespace mglm{
         u[k1] = v[k];
         return u;
     }
-    struct Plane {
+    struct plane {
         vec4 u;
         vec4 v;
-        Plane()=default;
-        Plane(const vec4& u, const vec4& v) : u(u), v(v) {}
+        plane()=default;
+        plane(const vec4& u, const vec4& v) : u(u), v(v) {}
 
-        bool operator==(const Plane&plane)const noexcept{
+        bool operator==(const plane&plane)const noexcept{
             return u == plane.u && v == plane.v;
         }
-        Plane orthonormalize() const noexcept{
+        plane orthonormalize() const noexcept{
             vec4 newU = normalize(u);
             // v在newU上的投影 = dot(v, newU) * newU
             vec4 newV = v - dot(v, newU) * newU;
-            return Plane(newU, normalize(newV));
+            return plane(newU, normalize(newV));
         }
     };
     namespace planes {
-        const Plane XY(vec4(1,0,0,0), vec4(0,1,0,0));
-        const Plane XZ(vec4(1,0,0,0), vec4(0,0,1,0));
-        const Plane XW(vec4(1,0,0,0), vec4(0,0,0,1));
-        const Plane YZ(vec4(0,1,0,0), vec4(0,0,1,0));
-        const Plane YW(vec4(0,1,0,0), vec4(0,0,0,1));
-        const Plane ZW(vec4(0,0,1,0), vec4(0,0,0,1));
+        const plane xy(vec4(1,0,0,0), vec4(0,1,0,0));
+        const plane xz(vec4(1,0,0,0), vec4(0,0,1,0));
+        const plane xw(vec4(1,0,0,0), vec4(0,0,0,1));
+        const plane yz(vec4(0,1,0,0), vec4(0,0,1,0));
+        const plane yw(vec4(0,1,0,0), vec4(0,0,0,1));
+        const plane zw(vec4(0,0,1,0), vec4(0,0,0,1));
     }
 
-    inline Plane getOrthogonalPlane(const Plane& p) {
+    inline plane getOrthogonalPlane(const plane& p) {
         vec4 e[4];
         int count = 0;
         
@@ -385,13 +385,13 @@ namespace mglm{
                 count++;
             }
         }
-        return Plane(e[2], e[3]);
+        return plane(e[2], e[3]);
     }
     //结果除以2,映射到[0, 1], 就类似dot
     //0:完全正交,1:交于一条直线,2:完全重合
-    inline float subspaceDot(const Plane& p, const Plane& p1) {
-        Plane op = p.orthonormalize();
-        Plane op1 = p1.orthonormalize();
+    inline float subspaceDot(const plane& p, const plane& p1) {
+        plane op = p.orthonormalize();
+        plane op1 = p1.orthonormalize();
         // 计算 U^T V 矩阵的四个元素
         float m00 = dot(op.u, op1.u);
         float m01 = dot(op.u, op1.v);

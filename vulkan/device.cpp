@@ -21,7 +21,7 @@ namespace vulkan{
         ci.instance       = instance;
         ci.pVulkanFunctions = &vmaFns;
         ci.vulkanApiVersion = apiVersion;
-
+        if(device == VK_NULL_HANDLE)spdlog::debug("in function {}:device is null, call CreateDevice before calling this function", __FUNCTION__);
         assert(device && "device is null, call CreateDevice before calling this function");
         allocator = vma::createAllocator(ci);
     }
@@ -109,41 +109,25 @@ namespace vulkan{
         }
         return false;
     }
-    void Device::SelectPhysicalDevice(bool (*SelectPhysicalDevice)(vk::PhysicalDevice)){
+    bool Device::SelectPhysicalDevice(bool (*SelectPhysicalDevice)(vk::PhysicalDevice)){
         std::vector<vk::PhysicalDevice>physicalDevices = instance.enumeratePhysicalDevices();
         if(physicalDevices.empty()){
-            spdlog::error("No suitable graphics card!");
-            spdlog::shutdown();
-            assert(0);
-            return;
+            return false;
         }
-        for (auto& device : physicalDevices) {
-            if(SelectPhysicalDevice(device)){
-                physical = device;
-                break;
+        if(SelectPhysicalDevice){
+            for (auto& device : physicalDevices) {
+                if(SelectPhysicalDevice(device)){
+                    physical = device;
+                    break;
+                }
             }
         }
         if(!physical){
             physical = physicalDevices[0];
         }
         physicalDeviceProperties = physical.getProperties();
-        // memoryProperties = physical.getMemoryProperties();
         queueFamiliesProperties = physical.getQueueFamilyProperties();
-        const char *deviceType = "OTHER";
-        if(physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eCpu){
-            deviceType = "CPU";
-        }
-        else if(physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu){
-            deviceType = "DISCRETE GPU";
-        }
-        else if(physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eIntegratedGpu){
-            deviceType = "INTEGRATED GPU";
-        }
-        else if(physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eVirtualGpu){
-            deviceType = "VIRTUAL GPU";
-        }
-        spdlog::info("API version: {}.{}.{} (raw 0x{:08X})", VK_API_VERSION_MAJOR(physicalDeviceProperties.apiVersion), VK_API_VERSION_MINOR(physicalDeviceProperties.apiVersion), VK_API_VERSION_PATCH(physicalDeviceProperties.apiVersion),physicalDeviceProperties.apiVersion);
-        spdlog::info("device type:{}, device name:{}", deviceType, physicalDeviceProperties.deviceName.data());
+        return true;
     }
     uint32_t Device::GetQueueFamiliesIndex(vk::QueueFlagBits queue)const noexcept{
         int32_t queueFamilyIndex = -1;

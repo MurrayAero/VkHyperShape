@@ -105,5 +105,4 @@ void Cylinder::Update(const void *useData){
         mWireframe.UpdateIndexData(*gpu.device, wireframe.data(), gpu.graphics, *gpu.pool);
         mWireframe.UpdateVertexData(*gpu.device, vertices.data(), gpu.graphics, *gpu.pool);
     }
-
 }

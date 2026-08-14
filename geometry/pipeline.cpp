@@ -10,12 +10,12 @@ VecType bezierTangent(const VecType& p0, const VecType& p1, const VecType& p2, c
     return (p1 - p0) * (3*u*u) + (p2 - p1) * (6*u*t) + (p3 - p2) * (3*t*t);
 }
 void findInitialFrame(const mglm::vec4& T, mglm::vec4& N1, mglm::vec4& N2, mglm::vec4& N3) {
-    mglm::Plane p;
+    mglm::plane p;
     p.u = mglm::normalize(T);
     p.v = mglm::getOrthogonal(p.u);
     p = p.orthonormalize();
 
-    mglm::Plane orthP = mglm::getOrthogonalPlane(p);
+    mglm::plane orthP = mglm::getOrthogonalPlane(p);
     
     N1 = p.v;
     N2 = orthP.u;
@@ -23,7 +23,7 @@ void findInitialFrame(const mglm::vec4& T, mglm::vec4& N1, mglm::vec4& N2, mglm:
 }
 
 bool transportFrame(const mglm::vec4& N1_prev, const mglm::vec4& N2_prev, const mglm::vec4& N3_prev, const mglm::vec4& T_curr, mglm::vec4& N1_curr, mglm::vec4& N2_curr, mglm::vec4& N3_curr) {
-    mglm::Plane p(N1_prev - T_curr * mglm::dot(T_curr, N1_prev), N2_prev - T_curr * mglm::dot(T_curr, N2_prev));
+    mglm::plane p(N1_prev - T_curr * mglm::dot(T_curr, N1_prev), N2_prev - T_curr * mglm::dot(T_curr, N2_prev));
     p = p.orthonormalize();
     if (mglm::length(p.v) < 1e-4f) return false;
 

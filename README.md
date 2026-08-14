@@ -24,3 +24,15 @@ VkHyperShape 专注于解决**四维空间到三维空间的投影与渲染**问
 
 ### 4D 投影管线
 本项目采用经典的**齐次坐标**体系，将维度从 3D 扩展到4D：
+
+## 编译步骤
+### 准备
+```bash
+cmake/make、g++/vs
+```
+### 编译
+```bash
+mkdir build && cd build && cmake ..
+linux直接make
+winsows下通常是打开.sln
+```
